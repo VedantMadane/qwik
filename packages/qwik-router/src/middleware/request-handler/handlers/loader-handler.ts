@@ -6,7 +6,6 @@ import {
   getRouteLoaderResponse,
   resolveRouteLoaderByHash,
   FULLPATH_HEADER,
-  type LoaderResponse,
 } from '../../../runtime/src/route-loaders';
 import { RedirectMessage } from '../redirect-handler';
 import { ServerError } from '../server-error';
@@ -58,14 +57,14 @@ export function jsonRequestWrapper(): RequestHandler {
         if (isLoader) {
           const location = requestEv.headers.get('Location') || '/';
           requestEv.headers.delete('Location');
-          await sendLoaderResponse(requestEv, { r: location });
+          await sendJsonResponse(requestEv, { r: location });
         } else {
           // Action redirects: let HTTP redirect propagate — client handles via response.redirected
           throw err;
         }
       } else if (err instanceof ServerError) {
         if (isLoader) {
-          await sendLoaderResponse(requestEv, { e: err });
+          await sendJsonResponse(requestEv, { e: err });
         } else {
           await sendActionResponse(requestEv, { e: err, s: err.status });
         }
@@ -76,7 +75,7 @@ export function jsonRequestWrapper(): RequestHandler {
           : 'Internal Server Error';
         const se = new ServerError(500, message);
         if (isLoader) {
-          await sendLoaderResponse(requestEv, { e: se });
+          await sendJsonResponse(requestEv, { e: se });
         } else {
           await sendActionResponse(requestEv, { e: se, s: 500 });
         }
@@ -113,22 +112,86 @@ export function loaderHandler(routeLoaders: LoaderInternal[]): RequestHandler {
       return;
     }
 
+    // ETag support: for string/function eTags, check If-None-Match BEFORE running the loader
+    if (loader.__eTag && loader.__eTag !== true) {
+      const eTag = resolvePreETag(loader.__eTag, requestEv);
+      if (eTag && checkETagMatch(requestEv, eTag)) {
+        return;
+      }
+    }
+
     const responseData = await getRouteLoaderResponse(loader.__qrl, loader.__validators, requestEv);
-    await sendLoaderResponse(requestEv, responseData, loader);
+    const data = await _serialize(responseData);
+
+    // For eTag: true, compute eTag from serialized data AFTER running the loader
+    if (loader.__eTag === true && responseData.d !== undefined) {
+      const eTag = `"${fnv1aHash(data)}"`;
+      if (checkETagMatch(requestEv, eTag)) {
+        return;
+      }
+    }
+
+    await sendLoaderResponse(requestEv, data, loader);
   };
+}
+
+/** Resolve eTag from a static string or function (before running the loader). */
+function resolvePreETag(
+  eTagOption: string | ((ev: RequestEvent) => string | null),
+  requestEv: RequestEvent
+): string | null {
+  if (typeof eTagOption === 'string') {
+    return `"${eTagOption}"`;
+  }
+  const result = eTagOption(requestEv);
+  return result ? `"${result}"` : null;
+}
+
+/** Set the ETag header and check If-None-Match. Returns true if 304 was sent. */
+function checkETagMatch(requestEv: RequestEventInternal, eTag: string): boolean {
+  requestEv.headers.set('ETag', eTag);
+  const ifNoneMatch = requestEv.request.headers.get('If-None-Match');
+  if (
+    ifNoneMatch &&
+    (ifNoneMatch === eTag || ifNoneMatch === `W/${eTag}` || `W/${ifNoneMatch}` === eTag)
+  ) {
+    requestEv.send(304 as any, '' as any);
+    return true;
+  }
+  return false;
+}
+
+/** FNV-1a hash for generating eTags from serialized data. */
+function fnv1aHash(str: string): string {
+  let hash = 0x811c9dc5; // FNV offset basis
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = (hash * 0x01000193) | 0; // FNV prime, keep 32-bit
+  }
+  return (hash >>> 0).toString(36);
 }
 
 async function sendLoaderResponse(
   requestEv: RequestEventInternal,
-  responseData: LoaderResponse,
+  data: string,
   loader?: LoaderInternal
 ) {
-  const data = await _serialize(responseData);
   requestEv.headers.set('Content-Type', 'application/json; charset=utf-8');
-  if (responseData.d !== undefined && loader?.__expires && loader.__expires > 0) {
+  if (loader?.__expires && loader.__expires > 0) {
     requestEv.cacheControl({ maxAge: loader.__expires });
   }
   requestEv.send(200, data);
+}
+
+/** Serialize and send a JSON response (used by error/redirect paths in jsonRequestWrapper). */
+async function sendJsonResponse(
+  requestEv: RequestEventInternal,
+  responseData: Record<string, unknown>,
+  status: number = 200
+) {
+  const data = await _serialize(responseData);
+  requestEv.headers.set('Content-Type', 'application/json; charset=utf-8');
+  requestEv.send(status, data);
 }
 
 async function sendActionResponse(

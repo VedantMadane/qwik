@@ -234,6 +234,7 @@ const getLoaderOptions = (rest: (LoaderOptions | DataValidator)[]) => {
   let serializationStrategy: SerializationStrategy = DEFAULT_LOADERS_SERIALIZATION_STRATEGY;
   let expires: number | undefined;
   let poll: boolean | undefined;
+  let eTag: LoaderOptions['eTag'] | undefined;
   const validators: DataValidator[] = [];
 
   if (rest.length === 1) {
@@ -254,6 +255,9 @@ const getLoaderOptions = (rest: (LoaderOptions | DataValidator)[]) => {
         if ('poll' in options) {
           poll = options.poll;
         }
+        if ('eTag' in options) {
+          eTag = options.eTag;
+        }
       }
     }
   } else if (rest.length > 1) {
@@ -265,6 +269,7 @@ const getLoaderOptions = (rest: (LoaderOptions | DataValidator)[]) => {
     serializationStrategy,
     expires,
     poll,
+    eTag,
   };
 };
 
@@ -460,7 +465,7 @@ export const routeLoaderQrl = ((
   loaderQrl: QRL<(event: RequestEventLoader) => unknown>,
   ...rest: (LoaderOptions | DataValidator)[]
 ): LoaderInternal => {
-  const { validators, serializationStrategy, expires, poll } = getLoaderOptions(rest);
+  const { validators, serializationStrategy, expires, poll, eTag } = getLoaderOptions(rest);
 
   function loader() {
     const state = _resolveContextWithoutSequentialScope(RouteStateContext)!;
@@ -477,6 +482,7 @@ export const routeLoaderQrl = ((
   loader.__serializationStrategy = serializationStrategy;
   loader.__expires = expires ?? 0;
   loader.__poll = poll ?? false;
+  loader.__eTag = eTag;
   Object.freeze(loader);
   return loader;
 }) as LoaderConstructorQRL;

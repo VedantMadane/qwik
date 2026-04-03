@@ -775,6 +775,19 @@ export type LoaderOptions = {
    * (polling behavior). When false (default), expired data is marked stale but not auto-refetched.
    */
   readonly poll?: boolean;
+  /**
+   * Enable ETag-based caching for this loader's JSON responses.
+   *
+   * - `true` — auto-compute an ETag by hashing the serialized response data (loader still runs)
+   * - `string` — static ETag value; if `If-None-Match` matches, the loader is skipped entirely
+   * - `(ev: RequestEvent) => string | null` — compute the ETag from the request context (params, URL,
+   *   headers, etc.); if `If-None-Match` matches, the loader is skipped entirely. Return null to
+   *   skip eTag for this request.
+   *
+   * When set, the server includes an `ETag` header on `q-loader-*.json` responses and returns `304
+   * Not Modified` if the client sends a matching `If-None-Match` header.
+   */
+  readonly eTag?: boolean | string | ((ev: RequestEvent) => string | null);
 };
 
 /** @public */
@@ -927,6 +940,7 @@ export interface LoaderInternal extends Loader<any> {
   __serializationStrategy: SerializationStrategy;
   __expires: number;
   __poll: boolean;
+  __eTag: boolean | string | ((ev: RequestEvent) => string | null) | undefined;
   (): LoaderSignal<unknown>;
 }
 
