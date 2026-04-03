@@ -15,13 +15,13 @@ import type {
   ValidatorReturn,
 } from '../../runtime/src/types';
 import {
-  getRouteLoaderData,
   getRouteLoaderCtx,
+  getRouteLoaderData,
   getRouteLoaderValues,
   setRouteLoaders,
 } from '../../runtime/src/route-loaders';
 import type { RequestEventInternal } from './request-event-core';
-import { loaderHandler } from './handlers/loader-handler';
+import { jsonRequestWrapper, loaderHandler } from './handlers/loader-handler';
 import { actionHandler } from './handlers/action-handler';
 import type { ErrorCodes, RequestEvent, RequestEventBase, RequestHandler } from './types';
 
@@ -68,6 +68,11 @@ export function createResolveRequestHandlers(deps: ResolveRequestHandlersDeps) {
     const isPageRoute = !!isLastModulePageRoute(route.$mods$);
 
     if (isPageRoute) {
+      /**
+       * JSON request wrapper must be before all middleware so it can rewrite the URL and catch
+       * redirects/errors from plugin/route middleware via try/catch on next()
+       */
+      requestHandlers.push(jsonRequestWrapper());
       requestHandlers.push(serverErrorMiddleware(route, renderHandler));
     }
 
@@ -285,8 +290,7 @@ export function createResolveRequestHandlers(deps: ResolveRequestHandlersDeps) {
         setRouteLoaders(requestEv, routeLoaders);
 
         // Run loaders directly and store raw values.
-        // AsyncSignals are created later in the component where the routeLoaderCtx
-        // is wrapped in useStore (needed for client-side reactivity).
+        // Errors/redirects propagate so middleware can catch them (e.g. plugin@errors).
         const loaderValues = getRouteLoaderValues(requestEv);
         await Promise.all(
           routeLoaders.map(async (loader) => {

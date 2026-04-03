@@ -16,6 +16,7 @@ export async function submitAction(
       status: number;
       data?: unknown;
       error?: unknown;
+      redirect?: string;
       loaderHashes?: string[];
       loaderValues?: Record<string, unknown>;
     }
@@ -63,6 +64,7 @@ export async function submitAction(
     const parsed = _deserialize<{
       d?: unknown;
       e?: unknown;
+      r?: string;
       s?: number;
       h?: string[];
       l?: Record<string, unknown>;
@@ -71,6 +73,7 @@ export async function submitAction(
       status: parsed?.s ?? response.status,
       data: parsed?.d,
       error: parsed?.e,
+      redirect: parsed?.r,
       loaderHashes: parsed?.h,
       loaderValues: parsed?.l,
     };
