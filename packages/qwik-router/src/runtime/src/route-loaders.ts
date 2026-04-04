@@ -173,15 +173,18 @@ const createRouteLoaderSignal = (loader: LoaderInternal, routeLoaderCtx: RouteLo
   const capture = isServer
     ? new ServerRouteLoaderCapture(loader.__id, loader.__qrl, loader.__validators)
     : loader.__id;
+  const searchFilter = loader.__search;
+  let lastFilteredSearch: string | undefined;
   return createAsync$(
-    async ({ track, info, abortSignal }) => {
+    async ({ track, info, previous, abortSignal }) => {
       if (isServer) {
         return (capture as ServerRouteLoaderCapture).load();
       }
       const id = capture as string;
       // Track reactive dependencies so the signal re-fetches when the route path changes
       const routePath = track(routeLoaderCtx.loaderPaths, id) as string | undefined;
-      // TODO strict mode that doesn't pass the full url and only passes allowed search params, returning previous otherwise
+      // Track the page URL — when search params are filtered, we still subscribe to
+      // pageUrl changes but skip the fetch if the filtered search hasn't changed.
       const pageUrl = track(routeLoaderCtx, 'pageUrl') as URL;
       const mHash = routeLoaderCtx.manifestHash;
       const basePath = routeLoaderCtx.basePath;
@@ -195,9 +198,24 @@ const createRouteLoaderSignal = (loader: LoaderInternal, routeLoaderCtx: RouteLo
       if (!routePath) {
         throw new Error(`Loader ${id} not available on current route`);
       }
+
+      // Filter search params: only include allowed params and skip fetch if unchanged
+      let fetchUrl = pageUrl;
+      if (searchFilter) {
+        const filteredSearch = filterSearchParams(pageUrl.searchParams, searchFilter);
+        if (previous !== undefined && filteredSearch === lastFilteredSearch) {
+          // Relevant search params didn't change — return previous value
+          return previous;
+        }
+        lastFilteredSearch = filteredSearch;
+        // Build a URL with only the allowed search params for the fetch
+        fetchUrl = new URL(pageUrl.href);
+        fetchUrl.search = filteredSearch;
+      }
+
       // Fetch from server
       const response = await fetchRouteLoaderData(id, routePath, mHash, {
-        pageUrl,
+        pageUrl: fetchUrl,
         basePath,
         ignoreCache: info === true,
         signal: abortSignal,
@@ -230,11 +248,24 @@ const createRouteLoaderSignal = (loader: LoaderInternal, routeLoaderCtx: RouteLo
   );
 };
 
+/** Build a sorted, stable search string from only the allowed param names. */
+const filterSearchParams = (params: URLSearchParams, allowed: string[]): string => {
+  const filtered = new URLSearchParams();
+  for (const name of allowed) {
+    for (const value of params.getAll(name)) {
+      filtered.append(name, value);
+    }
+  }
+  filtered.sort();
+  return filtered.toString() ? `?${filtered.toString()}` : '';
+};
+
 const getLoaderOptions = (rest: (LoaderOptions | DataValidator)[]) => {
   let serializationStrategy: SerializationStrategy = DEFAULT_LOADERS_SERIALIZATION_STRATEGY;
   let expires: number | undefined;
   let poll: boolean | undefined;
   let eTag: LoaderOptions['eTag'] | undefined;
+  let search: string[] | undefined;
   const validators: DataValidator[] = [];
 
   if (rest.length === 1) {
@@ -258,6 +289,9 @@ const getLoaderOptions = (rest: (LoaderOptions | DataValidator)[]) => {
         if ('eTag' in options) {
           eTag = options.eTag;
         }
+        if (options.search) {
+          search = options.search;
+        }
       }
     }
   } else if (rest.length > 1) {
@@ -270,6 +304,7 @@ const getLoaderOptions = (rest: (LoaderOptions | DataValidator)[]) => {
     expires,
     poll,
     eTag,
+    search,
   };
 };
 
@@ -465,7 +500,7 @@ export const routeLoaderQrl = ((
   loaderQrl: QRL<(event: RequestEventLoader) => unknown>,
   ...rest: (LoaderOptions | DataValidator)[]
 ): LoaderInternal => {
-  const { validators, serializationStrategy, expires, poll, eTag } = getLoaderOptions(rest);
+  const { validators, serializationStrategy, expires, poll, eTag, search } = getLoaderOptions(rest);
 
   function loader() {
     const state = _resolveContextWithoutSequentialScope(RouteStateContext)!;
@@ -483,6 +518,7 @@ export const routeLoaderQrl = ((
   loader.__expires = expires ?? 0;
   loader.__poll = poll ?? false;
   loader.__eTag = eTag;
+  loader.__search = search;
   Object.freeze(loader);
   return loader;
 }) as LoaderConstructorQRL;

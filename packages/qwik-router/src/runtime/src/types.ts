@@ -784,10 +784,19 @@ export type LoaderOptions = {
    *   headers, etc.); if `If-None-Match` matches, the loader is skipped entirely. Return null to
    *   skip eTag for this request.
    *
-   * When set, the server includes an `ETag` header on `q-loader-*.json` responses and returns `304
-   * Not Modified` if the client sends a matching `If-None-Match` header.
+   * When set, the server includes an ETag header on loader JSON responses and returns 304 Not
+   * Modified if the client sends a matching If-None-Match header.
    */
   readonly eTag?: boolean | string | ((ev: RequestEvent) => string | null);
+  /**
+   * Allowlist of URL search parameter names that this loader depends on.
+   *
+   * When set, the loader only re-fetches when the listed search params change — other param changes
+   * are ignored. Only the listed params are sent in the loader JSON request URL.
+   *
+   * When not set, all search params are sent and any change triggers a re-fetch.
+   */
+  readonly search?: string[];
 };
 
 /** @public */
@@ -941,6 +950,7 @@ export interface LoaderInternal extends Loader<any> {
   __expires: number;
   __poll: boolean;
   __eTag: boolean | string | ((ev: RequestEvent) => string | null) | undefined;
+  __search: string[] | undefined;
   (): LoaderSignal<unknown>;
 }
 
