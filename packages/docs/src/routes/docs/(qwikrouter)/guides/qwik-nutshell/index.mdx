@@ -581,11 +581,11 @@ export const useUserUpdate = routeAction$(async (data, requestContext) => {
 }));
 
 export default component$(() => {
-  // The `useUserUpdate` hook will return an `ActionStore<T>` containing the `value` returned from `routeAction$()`, and some other properties, such as `submit()`, which is used to submit the form programmatically, and `isRunning`. All of these properties are reactive, and will re-render the component whenever they change.
+  // The `useUserUpdate` hook will return an `ActionStore<T>` containing the `value` returned from `routeAction$()`, and some other properties, such as `submit()`, which is used to submit the form programmatically, and `loading`. All of these properties are reactive, and will re-render the component whenever they change.
   const userData = useUserUpdate();
   // userData.value is the value returned from `routeAction$()`, which is `undefined` before the form is submitted.
   // userData.formData is the form data that was submitted, it is `undefined` before the form is submitted.
-  // userData.isRunning is a boolean that is true when the form is being submitted.
+  // userData.loading is a boolean that is true when the form is being submitted.
   // userData.submit() is a function that can be used to submit the form programmatically.
   // userData.actionPath is the path to the action, which is used to submit the form.
   return (

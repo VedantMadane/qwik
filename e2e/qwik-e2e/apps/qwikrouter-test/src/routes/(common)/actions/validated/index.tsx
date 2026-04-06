@@ -49,25 +49,17 @@ const actionQrl = (data: JSONObject, { fail }: RequestEventAction) => {
   }
 
   return {
-    actionSuccess: 'シマエナガ',
+    actionSuccess: 'hey',
   } as ActionSuccessObject;
 };
 
-export const useLoader = routeLoader$(() => {
-  return {
-    stuff: 'hello',
-  };
-}, dataValidator);
-
-export const useAction1 = routeAction$(actionQrl, {
+const options = {
   validation: [typedDataValidator, dataValidator],
-} as ActionOptions);
-export const useAction2 = routeAction$(actionQrl, {
-  validation: [typedDataValidator],
-} as ActionOptions);
-export const useAction3 = routeAction$(actionQrl, {
-  validation: [dataValidator],
-} as ActionOptions);
+} satisfies ActionOptions;
+
+export const useAction1 = routeAction$(actionQrl, options);
+export const useAction2 = routeAction$(actionQrl, { validation: [typedDataValidator] });
+export const useAction3 = routeAction$(actionQrl, { validation: [dataValidator] });
 export const useAction4 = routeAction$(actionQrl, typedDataValidator, dataValidator);
 export const useAction5 = routeAction$(actionQrl, typedDataValidator);
 export const useAction6 = routeAction$(actionQrl, dataValidator);
@@ -79,106 +71,102 @@ export default component$(() => {
 
   // Use options object, use typed data validator, use data validator
   const action1 = useAction1();
+  if (action1.error) {
+    // Error includes validator error types
+    action1.error.fieldErrors;
+    action1.error.formErrors;
+    action1.error.message;
+  }
   if (action1.value) {
-    if (action1.value.failed) {
-      action1.value satisfies { failed: true } & (
-        | TypedDataValidatorError
-        | DataValidatorError
-        | ActionFailedObject
-      );
-    } else {
-      action1.value satisfies ActionSuccessObject;
-    }
+    action1.value satisfies ActionSuccessObject;
   }
 
   // Use options object, use typed data validator
   const action2 = useAction2();
+  if (action2.error) {
+    action2.error.fieldErrors;
+    action2.error.formErrors;
+  }
   if (action2.value) {
-    if (action2.value.failed) {
-      action2.value satisfies { failed: true } & (TypedDataValidatorError | ActionFailedObject);
-    } else {
-      action2.value satisfies ActionSuccessObject;
-    }
+    action2.value satisfies ActionSuccessObject;
   }
 
   // Use options object, use data validator
   const action3 = useAction3();
+  if (action3.error) {
+    action3.error.message;
+  }
   if (action3.value) {
-    if (action3.value.failed) {
-      action3.value satisfies { failed: true } & (DataValidatorError | ActionFailedObject);
-    } else {
-      action3.value satisfies ActionSuccessObject;
-    }
+    action3.value satisfies ActionSuccessObject;
   }
 
   // Use typed data validator, use data validator
   const action4 = useAction4();
+  if (action4.error) {
+    action4.error.fieldErrors;
+    action4.error.formErrors;
+    action4.error.message;
+  }
   if (action4.value) {
-    if (action4.value.failed) {
-      action4.value satisfies { failed: true } & (
-        | TypedDataValidatorError
-        | DataValidatorError
-        | ActionFailedObject
-      );
-    } else {
-      action4.value satisfies ActionSuccessObject;
-    }
+    action4.value satisfies ActionSuccessObject;
   }
 
   // Use typed data validator
   const action5 = useAction5();
+  if (action5.error) {
+    action5.error.fieldErrors;
+    action5.error.formErrors;
+  }
   if (action5.value) {
-    if (action5.value.failed) {
-      action5.value satisfies { failed: true } & (TypedDataValidatorError | ActionFailedObject);
-    } else {
-      action5.value satisfies ActionSuccessObject;
-    }
+    action5.value satisfies ActionSuccessObject;
   }
 
   // Use data validator
   const action6 = useAction6();
+  if (action6.error) {
+    action6.error.message;
+  }
   if (action6.value) {
-    if (action6.value.failed) {
-      action6.value satisfies { failed: true } & (DataValidatorError | ActionFailedObject);
-    } else {
-      action6.value satisfies ActionSuccessObject;
-    }
+    action6.value satisfies ActionSuccessObject;
   }
 
   // No validators
   const action7 = useAction7();
   if (action7.value) {
-    if (action7.value.failed) {
-      action7.value satisfies { failed: true } & ActionFailedObject;
-    } else {
-      action7.value satisfies ActionSuccessObject;
-    }
+    action7.value satisfies ActionSuccessObject;
   }
 
   // No validators, with action id
   const action8 = useAction7();
   if (action8.value) {
-    if (action8.value.failed) {
-      action8.value satisfies { failed: true } & ActionFailedObject;
-    } else {
-      action8.value satisfies ActionSuccessObject;
-    }
+    action8.value satisfies ActionSuccessObject;
   }
 
   return (
     <div>
       <h1>Validated</h1>
-      {loader.value.failed ? (
+      {loader.error ? (
         <div>
           <p>Failed</p>
-          <p>{loader.value.message}</p>
+          <p>{(loader.error as any).message}</p>
         </div>
       ) : (
         <div>
           <p>Success</p>
-          <p>{loader.value.stuff}</p>
+          <p>{(loader.value as any)?.stuff}</p>
         </div>
       )}
     </div>
   );
+});
+
+export const useLoader = routeLoader$((ev) => {
+  if (ev.query.get('secret') === '123') {
+    return {
+      stuff: 'thing',
+    };
+  }
+  return ev.fail(500, {
+    message: 'Secret not found',
+  });
 });

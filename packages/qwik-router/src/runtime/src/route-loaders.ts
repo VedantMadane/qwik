@@ -437,8 +437,8 @@ export const getRouteLoaderResponse = async (
 ): Promise<LoaderResponse> => {
   try {
     const value = await getRouteLoaderData(loaderQrl, validators, requestEv);
-    if (value && typeof value === 'object' && (value as any).failed) {
-      return { e: new ServerError(requestEv.status(), value) };
+    if (value instanceof ServerError) {
+      return { e: value };
     }
     return { d: value };
   } catch (err) {
@@ -450,7 +450,8 @@ export const getRouteLoaderResponse = async (
     if (err instanceof ServerError) {
       return { e: err };
     }
-    throw err;
+    console.error('Loader error:', err);
+    return { e: new ServerError(500, 'Internal Server Error') };
   }
 };
 

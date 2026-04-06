@@ -1,6 +1,6 @@
 import type { _deserialize, _serialize, _verifySerializable } from '@qwik.dev/core/internal';
 import type { Render, RenderOptions } from '@qwik.dev/core/server';
-import type { Action, FailReturn, Loader } from '@qwik.dev/router';
+import type { Action, Loader } from '@qwik.dev/router';
 import type { ServerError } from './server-error';
 import type { AbortMessage, RedirectMessage } from './redirect-handler';
 import type { RewriteMessage } from './rewrite-handler';
@@ -482,7 +482,7 @@ declare global {
 export interface RequestEventAction<
   PLATFORM = QwikRouterPlatform,
 > extends RequestEventCommon<PLATFORM> {
-  fail: <T extends Record<string, any>>(status: number, returnData: T) => FailReturn<T>;
+  fail: <T extends Record<string, any>>(status: number, returnData: T) => ServerError<T> & T;
 }
 
 /** @public */

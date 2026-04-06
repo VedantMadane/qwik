@@ -13,6 +13,7 @@ import { type RequestEventInternal } from '../request-event-core';
 import { IsQAction, QActionId } from '../request-path';
 import type { QRL } from '@qwik.dev/core';
 import type { RequestEventBase } from '../types';
+import { ServerError } from '../server-error';
 
 /**
  * Handler for action requests (`?qaction={actionId}`).
@@ -87,31 +88,51 @@ export function actionHandler(
       throw new Error(`Expected request data for the action id ${actionId} to be an object`);
     }
 
-    let actionResult: unknown;
-    const result = await runValidators(requestEv, action.__validators, data, devMode);
-    if (!result.success) {
-      actionResult = requestEv.fail(result.status ?? 500, result.error);
-    } else {
-      const actionResolved = devMode
-        ? await measure(requestEv, action.__qrl.getHash(), () =>
-            action!.__qrl.call(requestEv, result.data as JSONObject, requestEv)
-          )
-        : await action.__qrl.call(requestEv, result.data as JSONObject, requestEv);
-      if (devMode) {
-        verifySerializable(actionResolved, action.__qrl);
-      }
-      actionResult = actionResolved;
-    }
-    requestEv.sharedMap.set('@actionResult', actionResult);
+    let actionError: ServerError | undefined;
+    let actionData: unknown;
 
-    let responseData: Record<string, unknown>;
+    try {
+      const result = await runValidators(requestEv, action.__validators, data, devMode);
+      if (!result.success) {
+        actionError = requestEv.fail(result.status ?? 500, result.error);
+      } else {
+        const actionResolved = devMode
+          ? await measure(requestEv, action.__qrl.getHash(), () =>
+              action!.__qrl.call(requestEv, result.data as JSONObject, requestEv)
+            )
+          : await action.__qrl.call(requestEv, result.data as JSONObject, requestEv);
+        if (devMode) {
+          verifySerializable(actionResolved, action.__qrl);
+        }
+        if (actionResolved instanceof ServerError) {
+          actionError = actionResolved;
+        } else {
+          actionData = actionResolved;
+        }
+      }
+    } catch (err) {
+      if (err instanceof ServerError) {
+        actionError = err;
+      } else if (err instanceof Error) {
+        console.error('Action error:', err);
+        actionError = new ServerError(500, 'Internal Server Error');
+      } else {
+        // RedirectMessage, AbortMessage, etc. — re-throw for middleware
+        throw err;
+      }
+    }
+
+    requestEv.sharedMap.set('@actionResult', actionError ?? actionData);
+
+    // Build response envelope: d=data, e=error, s=status, h=hashes, l=loaders
+    const responseData: Record<string, unknown> = {
+      ...(actionError ? { e: actionError } : { d: actionData }),
+      s: actionError ? actionError.status : requestEv.status(),
+    };
 
     if (action.__invalidate) {
       // Action specifies which loaders to invalidate — send only hashes, client re-fetches
-      responseData = {
-        result: actionResult,
-        loaderHashes: action.__invalidate,
-      };
+      responseData.h = action.__invalidate;
     } else {
       // No invalidate list — re-run ALL loaders and send their values back.
       // Store in request's loaderValues so cross-loader resolveValue() works.
@@ -125,15 +146,12 @@ export function actionHandler(
           );
         })
       );
-      responseData = {
-        result: actionResult,
-        loaders: loaderValues,
-      };
+      responseData.l = loaderValues;
     }
 
     const serialized = await _serialize(responseData);
     requestEv.headers.set('Content-Type', 'application/json; charset=utf-8');
-    requestEv.send(200, serialized);
+    requestEv.send(actionError ? actionError.status : 200, serialized);
   };
 }
 

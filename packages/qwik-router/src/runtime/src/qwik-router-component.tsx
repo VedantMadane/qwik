@@ -80,6 +80,7 @@ import type {
   RouteStateInternal,
   ScrollState,
 } from './types';
+import { ServerError } from '@qwik.dev/router/middleware/request-handler';
 import { submitAction } from './use-endpoint';
 import { useQwikRouterEnv } from './use-functions';
 import { isSameOrigin, isSamePath, toPath, toUrl } from './utils';
@@ -216,16 +217,16 @@ export const useQwikRouter = (props?: QwikRouterProps) => {
   });
 
   const currentActionId = env.response.action;
-  const currentAction = currentActionId ? env.response.actionResult : undefined;
+  const currentActionResult = currentActionId ? env.response.actionResult : undefined;
   const actionState = useSignal<RouteActionValue>(
-    currentAction
+    currentActionResult
       ? {
           id: currentActionId!,
           data: env.response.formData,
-          output: {
-            result: currentAction,
-            status: env.response.status,
-          },
+          output:
+            currentActionResult instanceof ServerError
+              ? { error: currentActionResult, status: currentActionResult.status }
+              : { data: currentActionResult, status: env.response.status },
         }
       : undefined
   );
@@ -479,14 +480,15 @@ export const useQwikRouter = (props?: QwikRouterProps) => {
           actionData = {
             status: result.status,
             action: action.id,
-            actionResult: result.result,
+            actionResult: result.error ?? result.data,
           };
 
           // Resolve the action promise
           if (action.resolve) {
             action.resolve({
               status: result.status,
-              result: result.result,
+              data: result.data,
+              error: result.error,
             });
           }
 

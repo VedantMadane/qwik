@@ -233,20 +233,32 @@ export function createResolveRequestHandlers(deps: ResolveRequestHandlersDeps) {
                 `Expected request data for the action id ${selectedActionId} to be an object`
               );
             }
-            const result = await runValidators(requestEv, action.__validators, data);
             let actionResult: unknown;
-            if (!result.success) {
-              actionResult = requestEv.fail(result.status ?? 500, result.error);
-            } else {
-              const actionResolved = isDev
-                ? await measure(requestEv, action.__qrl.getHash(), () =>
-                    action.__qrl.call(requestEv, result.data as JSONObject, requestEv)
-                  )
-                : await action.__qrl.call(requestEv, result.data as JSONObject, requestEv);
-              if (isDev) {
-                verifySerializable(actionResolved, action.__qrl);
+            try {
+              const result = await runValidators(requestEv, action.__validators, data);
+              if (!result.success) {
+                actionResult = requestEv.fail(result.status ?? 500, result.error);
+              } else {
+                const actionResolved = isDev
+                  ? await measure(requestEv, action.__qrl.getHash(), () =>
+                      action.__qrl.call(requestEv, result.data as JSONObject, requestEv)
+                    )
+                  : await action.__qrl.call(requestEv, result.data as JSONObject, requestEv);
+                if (isDev) {
+                  verifySerializable(actionResolved, action.__qrl);
+                }
+                actionResult = actionResolved;
               }
-              actionResult = actionResolved;
+            } catch (err) {
+              if (err instanceof deps.ServerError) {
+                actionResult = err;
+              } else if (err instanceof Error) {
+                console.error('Action error:', err);
+                actionResult = new deps.ServerError(500, 'Internal Server Error');
+              } else {
+                // RedirectMessage, AbortMessage, etc. — re-throw for middleware
+                throw err;
+              }
             }
             requestEv.sharedMap.set('@actionResult', actionResult);
           }

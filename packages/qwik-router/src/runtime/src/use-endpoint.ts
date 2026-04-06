@@ -6,7 +6,7 @@ import { QACTION_KEY } from './constants';
  * Submit an action to the server and get the result.
  *
  * POSTs to `/routePath/?qaction={actionId}` with `Accept: application/json`. The server runs the
- * action and returns the action result together with the loader hashes that should be invalidated.
+ * action and returns the result in an envelope: d=data, e=error, s=status, h=hashes, l=loaders.
  */
 export async function submitAction(
   action: NonNullable<RouteActionValue>,
@@ -14,7 +14,8 @@ export async function submitAction(
 ): Promise<
   | {
       status: number;
-      result: unknown;
+      data?: unknown;
+      error?: unknown;
       loaderHashes?: string[];
       loaderValues?: Record<string, unknown>;
     }
@@ -59,16 +60,19 @@ export async function submitAction(
 
   if ((response.headers.get('content-type') || '').includes('json')) {
     const text = await response.text();
-    const data = _deserialize<{
-      result: unknown;
-      loaderHashes?: string[];
-      loaders?: Record<string, unknown>;
+    const parsed = _deserialize<{
+      d?: unknown;
+      e?: unknown;
+      s?: number;
+      h?: string[];
+      l?: Record<string, unknown>;
     }>(text);
     return {
-      status: response.status,
-      result: data?.result,
-      loaderHashes: data?.loaderHashes,
-      loaderValues: data?.loaders,
+      status: parsed?.s ?? response.status,
+      data: parsed?.d,
+      error: parsed?.e,
+      loaderHashes: parsed?.h,
+      loaderValues: parsed?.l,
     };
   }
 

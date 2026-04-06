@@ -14,6 +14,7 @@ import * as v from 'valibot';
 import * as z from 'zod';
 import { QACTION_KEY, QDATA_KEY, QFN_KEY } from './constants';
 import type { FormSubmitCompletedDetail } from './form-component';
+import type { ServerError } from '@qwik.dev/router/middleware/request-handler';
 import { getRequestEvent } from './route-loaders';
 import type {
   ActionConstructor,
@@ -56,9 +57,10 @@ export const routeActionQrl = ((
     const initialState: Editable<Partial<ActionStore<unknown, unknown>>> = {
       actionPath: `?${QACTION_KEY}=${id}`,
       submitted: false,
-      isRunning: false,
+      loading: false,
       status: undefined,
       value: undefined,
+      error: undefined,
       formData: undefined,
     };
     const state = useStore<Editable<ActionStore<unknown, unknown>>>(() => {
@@ -69,9 +71,15 @@ export const routeActionQrl = ((
           initialState.formData = data;
         }
         if (value.output) {
-          const { status, result } = value.output;
+          const { status, data: resultData, error: resultError } = value.output;
           initialState.status = status;
-          initialState.value = result;
+          if (resultError) {
+            initialState.error = resultError as any;
+            initialState.value = undefined;
+          } else {
+            initialState.value = resultData;
+            initialState.error = undefined;
+          }
         }
       }
       return initialState as ActionStore<unknown, unknown>;
@@ -104,22 +112,32 @@ Action.run() can only be called on the browser, for example when a user clicks a
           state.formData = data;
         }
         state.submitted = true;
-        state.isRunning = true;
+        state.loading = true;
         loc.isNavigating = true;
         currentAction.value = {
           data: data as Record<string, unknown>,
           id,
           resolve: noSerialize(resolve),
         };
-      }).then(({ result, status }) => {
-        state.isRunning = false;
+      }).then(({ data: resultData, error: resultError, status }) => {
+        state.loading = false;
         state.status = status;
-        state.value = result;
+        if (resultError) {
+          state.error = resultError as any;
+          state.value = undefined;
+        } else {
+          state.value = resultData;
+          state.error = undefined;
+        }
         if (form) {
           if (form.getAttribute('data-spa-reset') === 'true') {
             form.reset();
           }
-          const detail = { status, value: result } satisfies FormSubmitCompletedDetail<unknown>;
+          const detail = {
+            status,
+            value: resultData,
+            error: resultError,
+          } satisfies FormSubmitCompletedDetail<unknown>;
           form.dispatchEvent(
             new CustomEvent('submitcompleted', {
               bubbles: false,
@@ -131,7 +149,8 @@ Action.run() can only be called on the browser, for example when a user clicks a
         }
         return {
           status: status,
-          value: result,
+          value: resultData,
+          error: resultError as ServerError | undefined,
         };
       });
     });

@@ -43,14 +43,12 @@ When submitting a request to a `routeAction()`, the request event and data under
 export default component$(() => {
   const action = useAction();
 
-  // action value is undefined before submitting
-  if (action.value) {
-    if (action.value.failed) {
-      // action failed if query string has no secret
-      action.value satisfies { failed: true; message: string };
-    } else {
-      action.value satisfies { searchResult: string };
-    }
+  // action error is undefined before submitting or on success
+  if (action.error) {
+    // action failed if query string has no secret
+    action.error satisfies { message: string };
+  } else if (action.value) {
+    action.value satisfies { searchResult: string };
   }
 
   return (

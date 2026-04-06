@@ -7,7 +7,6 @@
 import type { Action } from '@qwik.dev/router';
 import type { AsyncLocalStorage } from 'node:async_hooks';
 import type { EnvGetter as EnvGetter_2 } from '@qwik.dev/router/middleware/request-handler';
-import type { FailReturn } from '@qwik.dev/router';
 import type { JSXOutput } from '@qwik.dev/core';
 import type { Loader as Loader_2 } from '@qwik.dev/router';
 import type { QwikIntrinsicElements } from '@qwik.dev/core';
@@ -115,7 +114,7 @@ export interface RequestEvent<PLATFORM = QwikRouterPlatform> extends RequestEven
 // @public (undocumented)
 export interface RequestEventAction<PLATFORM = QwikRouterPlatform> extends RequestEventCommon<PLATFORM> {
     // (undocumented)
-    fail: <T extends Record<string, any>>(status: number, returnData: T) => FailReturn<T>;
+    fail: <T extends Record<string, any>>(status: number, returnData: T) => ServerError<T> & T;
 }
 
 // @public (undocumented)

@@ -290,7 +290,7 @@ export default component$(() => {
         <input name="firstName" />
         <input name="lastName" />
 
-        {action.value?.failed && <p>{action.value.fieldErrors?.firstName}</p>}
+        {action.error && <p>{action.error.fieldErrors?.firstName}</p>}
         <button type="submit">Add user</button>
       </Form>
       {action.value?.success && (
@@ -390,7 +390,7 @@ export const useAddUser = routeAction$(
 );
 ```
 
-Failures are stored in the `action.value` property, just like the success value. However, the `action.value.failed` property is set to `true` when the action fails. Futhermore, failure messages can be found in the `fieldErrors` object according to properties defined in your Zod schema.
+Failures are stored in the `action.error` property. When the action fails, `action.error` will contain the error data. Failure messages can be found in the `fieldErrors` object according to properties defined in your Zod schema.
 
 The `fieldErrors` become a dot notation object. See [Complex forms](/docs/advanced/complex-forms) for more information.
 
@@ -404,14 +404,14 @@ export default component$(() => {
     <Form action={action}>
       <input name="name" />
       <button type="submit">Add user</button>
-      {action.value?.failed && <p>{action.value.fieldErrors.name}</p>}
+      {action.error && <p>{action.error.fieldErrors.name}</p>}
       {action.value?.userID && <p>User added successfully</p>}
     </Form>
   );
 });
 ```
 
-Thanks to Typescript type discrimination, you can use the `action.value.failed` property to discriminate between success and failure.
+Thanks to Typescript type discrimination, you can use the `action.error` property to discriminate between success and failure.
 
 ## Previous form state
 

@@ -1,6 +1,5 @@
 import { component$ } from '@qwik.dev/core';
 import { routeAction$, z, zod$ } from '@qwik.dev/router';
-import type { ValidatorErrorType } from 'packages/qwik-router/src/runtime/src/types';
 
 // This is a TypeScript type validation test only.
 
@@ -22,13 +21,12 @@ export default component$(() => {
   fooValue satisfies MyObject;
 
   const zodAction = useZodObjectAction();
-  const zodValue = zodAction.value!;
-  if (zodValue.failed) {
-    zodValue satisfies { failed: true } & ValidatorErrorType<{
-      name: string;
-    }>;
-  } else {
-    zodValue satisfies MyObject;
+  if (zodAction.error) {
+    zodAction.error.fieldErrors;
+    zodAction.error.formErrors;
+  }
+  if (zodAction.value) {
+    zodAction.value satisfies MyObject;
   }
   return <>TEST</>;
 });

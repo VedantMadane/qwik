@@ -70,8 +70,7 @@ export default component$(() => {
       <div>{pet.value.pet}</div>
       <div>
         {petWithValidation.value.pet}
-        {petWithValidation.value.failed}
-        {petWithValidation.value.validationFailReason}
+        {petWithValidation.error ? String(petWithValidation.error) : ''}
       </div>
       <div>
         {dynamicPet.value.dog}
@@ -80,19 +79,15 @@ export default component$(() => {
       <div>
         {dynamicPetWithValidation.value.dog}
         {dynamicPetWithValidation.value.rat}
-        {dynamicPetWithValidation.value.failed}
-        {dynamicPetWithValidation.value.validationFailReason}
+        {dynamicPetWithValidation.error ? String(dynamicPetWithValidation.error) : ''}
       </div>
       <div>
         {randomFailed.value.pet}
-        {randomFailed.value.failed}
-        {randomFailed.value.loaderFailedReason}
+        {randomFailed.error ? String(randomFailed.error) : ''}
       </div>
       <div>
         {randomFailedWithValidator.value.pet}
-        {randomFailedWithValidator.value.failed}
-        {randomFailedWithValidator.value.loaderFailedReason}
-        {randomFailedWithValidator.value.validationFailReason}
+        {randomFailedWithValidator.error ? String(randomFailedWithValidator.error) : ''}
       </div>
     </div>
   );

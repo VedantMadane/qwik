@@ -22,7 +22,7 @@ export default component$(() => {
         <input type="hidden" name="people.0.name" value="Fred" />
         <input type="hidden" name="people.1.name" value="Sam" />
 
-        <button id="issue3183-button" disabled={dotNotation.isRunning}>
+        <button id="issue3183-button" disabled={dotNotation.loading}>
           Dot Notation
         </button>
       </Form>

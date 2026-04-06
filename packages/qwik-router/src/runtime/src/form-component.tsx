@@ -5,7 +5,8 @@ import { useNavigate } from './use-functions';
 /** @public */
 export interface FormSubmitCompletedDetail<T> {
   status: number;
-  value: T;
+  value?: T;
+  error?: unknown;
 }
 
 /** @public */

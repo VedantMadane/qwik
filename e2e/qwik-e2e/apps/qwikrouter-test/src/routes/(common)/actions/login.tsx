@@ -37,7 +37,7 @@ export const SecretForm = component$(() => {
   return (
     <>
       <Form action={action} id="secret-form">
-        {action.isRunning && (
+        {action.loading && (
           <p id="running" class={styles.processing}>
             Running...
           </p>
@@ -51,8 +51,8 @@ export const SecretForm = component$(() => {
               placeholder="admin"
               value={action.formData?.get('username')}
             />
-            {action.value?.fieldErrors?.username && (
-              <p class={styles.error}>{action.value.fieldErrors.username}</p>
+            {action.error?.fieldErrors?.username && (
+              <p class={styles.error}>{action.error.fieldErrors.username}</p>
             )}
           </label>
         </div>
@@ -60,14 +60,14 @@ export const SecretForm = component$(() => {
           <label id="label-code">
             Code:
             <input type="text" name="code" placeholder="123" value={action.formData?.get('code')} />
-            {action.value?.fieldErrors?.code && (
-              <p class={styles.error}>{action.value.fieldErrors.code}</p>
+            {action.error?.fieldErrors?.code && (
+              <p class={styles.error}>{action.error.fieldErrors.code}</p>
             )}
           </label>
         </div>
-        {action.value?.message && (
+        {action.error?.message && (
           <p id="form-error" class={styles.error}>
-            {action.value.message}
+            {action.error.message}
           </p>
         )}
         {action.value?.secret && (
@@ -75,7 +75,7 @@ export const SecretForm = component$(() => {
             {action.value.secret}
           </p>
         )}
-        <button value="hello" name="button" id="submit" disabled={action.isRunning}>
+        <button value="hello" name="button" id="submit" disabled={action.loading}>
           Submit
         </button>
       </Form>

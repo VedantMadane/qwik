@@ -78,8 +78,7 @@ export default component$(() => {
   const addUserAction = useAddUserAction();
   const addEmail = useSignal('');
   useTask$(({ track }) => {
-    const isRunning = track(() => addUserAction.isRunning);
-    if (!isRunning) {
+    if (!track(addUserAction, 'loading')) {
       addEmail.value = '';
     }
   });

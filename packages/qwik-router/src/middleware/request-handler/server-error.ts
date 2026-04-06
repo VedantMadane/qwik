@@ -5,5 +5,8 @@ export class ServerError<T = any> extends Error {
     public data: T
   ) {
     super(typeof data === 'string' ? data : undefined);
+    if (data && typeof data === 'object') {
+      Object.assign(this, data);
+    }
   }
 }

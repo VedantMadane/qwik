@@ -19,7 +19,7 @@ export default component$(() => {
         <input type="hidden" name="credentials.password" value="pass" />
         <input type="hidden" name="array[]" value="1" />
         <input type="hidden" name="array[]" value="2" />
-        <button id="issue3497-button" disabled={dotNotation.isRunning}>
+        <button id="issue3497-button" disabled={dotNotation.loading}>
           Dot Notation
         </button>
       </Form>

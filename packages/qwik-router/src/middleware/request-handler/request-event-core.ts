@@ -1,7 +1,6 @@
 import { _deserialize, isDev } from '@qwik.dev/core/internal';
 import type {
   ActionInternal,
-  FailReturn,
   JSONValue,
   LoadedRoute,
   LoaderInternal,
@@ -297,14 +296,11 @@ export function createRequestEventWithDeps(
       return typeof returnData === 'function' ? returnData : () => returnData;
     },
 
-    fail: <T extends Record<string, any>>(statusCode: number, data: T): FailReturn<T> => {
+    fail: <T extends Record<string, any>>(statusCode: number, data: T): ServerError<T> & T => {
       check();
       status = statusCode;
       headers.delete('Cache-Control');
-      return {
-        failed: true,
-        ...data,
-      };
+      return new deps.ServerError(statusCode, data) as ServerError<T> & T;
     },
 
     text: (statusCode: number, text: string) => {
