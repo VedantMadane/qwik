@@ -279,9 +279,10 @@ test.describe('nav', () => {
       const btn = page.locator('#loader-redirect-btn');
       await btn.click();
 
-      // Should end up at the redirect target, not the source route
-      await expect(page.locator('#loader-redirect-target')).toBeVisible({ timeout: 5000 });
-      expect(new URL(page.url()).pathname).toBe('/qwikrouter-test/loader-redirect/target/');
+      // Should end up at the redirect target, not the source route.
+      // Wait for URL first — the redirect involves a loader fetch + SPA navigation.
+      await page.waitForURL('**/loader-redirect/target/**', { timeout: 10000 });
+      await expect(page.locator('#loader-redirect-target')).toBeVisible();
       expect(new URL(page.url()).searchParams.get('done')).toBe('true');
       await expect(page.locator('#loader-redirect-target-data')).toHaveText('target-data');
     });

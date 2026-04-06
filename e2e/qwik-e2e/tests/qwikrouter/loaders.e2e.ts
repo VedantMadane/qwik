@@ -49,18 +49,22 @@ test.describe('loaders', () => {
       await expect(nestedName).toHaveText('name: Manuel');
 
       await page.locator('#link-stuff').click();
+      // Wait for URL to change first, then verify content
+      await page.waitForURL('**/loaders/stuff/**');
+      await expect(nestedName).toHaveText('name: stuff');
       await expect(title).toHaveText('Loaders - Qwik', { useInnerText: true });
       await expect(date).toHaveText('date: 2021-01-01T00:00:00.000Z');
       await expect(slow).toHaveText('slow: 123');
-      await expect(nestedName).toHaveText('name: stuff');
       await expect(nestedDate).toHaveText('date: 2021-01-01T00:00:00.000Z');
       await expect(nestedDep).toHaveText('dep: 84');
 
       await page.locator('#link-welcome').click();
+      // Wait for URL to change first, then verify content
+      await page.waitForURL('**/loaders/welcome/**');
+      await expect(nestedName).toHaveText('name: welcome');
       await expect(title).toHaveText('Loaders - Qwik', { useInnerText: true });
       await expect(date).toHaveText('date: 2021-01-01T00:00:00.000Z');
       await expect(slow).toHaveText('slow: 123');
-      await expect(nestedName).toHaveText('name: welcome');
       await expect(nestedDate).toHaveText('date: 2021-01-01T00:00:00.000Z');
       await expect(nestedDep).toHaveText('dep: 84');
     });
