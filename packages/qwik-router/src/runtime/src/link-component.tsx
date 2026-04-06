@@ -11,15 +11,15 @@ import {
   type QwikIntrinsicElements,
   type QwikVisibleEvent,
 } from '@qwik.dev/core';
-import { preloadRouteBundles } from './client-navigate';
-import { loadClientData } from './use-endpoint';
-import { useLocation, useNavigate } from './use-functions';
+import { prefetchRoute } from './prefetch-route';
+import { useDocumentHead, useLocation, useNavigate } from './use-functions';
 import { getClientNavPath, shouldPreload } from './utils';
 
 /** @public */
 export const Link = component$<LinkProps>((props) => {
   const nav = useNavigate();
   const loc = useLocation();
+  const head = useDocumentHead();
   const originalHref = props.href;
   const anchorRef = useSignal<HTMLAnchorElement>();
   const {
@@ -48,14 +48,7 @@ export const Link = component$<LinkProps>((props) => {
 
         if (elm && elm.href) {
           const url = new URL(elm.href);
-          preloadRouteBundles(url.pathname);
-
-          if (elm.hasAttribute('data-prefetch')) {
-            loadClientData(url, {
-              preloadRouteBundles: false,
-              isPrefetch: true,
-            });
-          }
+          prefetchRoute(url, elm.hasAttribute('data-prefetch'), 0.8, head.manifestHash);
         }
       })
     : undefined;
@@ -84,7 +77,7 @@ export const Link = component$<LinkProps>((props) => {
 
   const handlePreload = $((_: any, elm: HTMLAnchorElement) => {
     const url = new URL(elm.href);
-    preloadRouteBundles(url.pathname, 1);
+    prefetchRoute(url, false, 1);
   });
 
   useVisibleTask$(({ track }) => {

@@ -21,12 +21,11 @@ export function isStaticPath(method: string, url: URL) {
   if (staticPaths.has(p)) {
     return true;
   }
-  if (p.endsWith('/q-data.json')) {
-    const pWithoutQdata = p.replace(/\/q-data.json$/, '');
-    if (staticPaths.has(pWithoutQdata + '/')) {
-      return true;
-    }
-    if (staticPaths.has(pWithoutQdata)) {
+  // Per-loader files: q-loader-{id}.{hash}.json
+  const loaderMatch = p.match(/\/q-loader-[^.]+\.[^.]+\.json$/);
+  if (loaderMatch) {
+    const pWithoutLoader = p.slice(0, p.length - loaderMatch[0].length);
+    if (staticPaths.has(pWithoutLoader + '/') || staticPaths.has(pWithoutLoader)) {
       return true;
     }
   }

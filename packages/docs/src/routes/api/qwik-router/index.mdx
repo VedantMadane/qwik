@@ -1606,6 +1606,19 @@ LoadedRoute
 </td></tr>
 <tr><td>
 
+loaderValues
+
+</td><td>
+
+</td><td>
+
+Record&lt;string, unknown&gt;
+
+</td><td>
+
+</td></tr>
+<tr><td>
+
 params
 
 </td><td>
@@ -1626,6 +1639,19 @@ response
 </td><td>
 
 EndpointResponse
+
+</td><td>
+
+</td></tr>
+<tr><td>
+
+routeLoaderCtx
+
+</td><td>
+
+</td><td>
+
+import('./route-loaders').RouteLoaderCtx
 
 </td><td>
 
@@ -2287,6 +2313,21 @@ string
 _(Optional)_ The parameter name when this node is reached via `_W` or `_A` from the parent
 
 </td></tr>
+<tr><td>
+
+\_R?
+
+</td><td>
+
+</td><td>
+
+string[]
+
+</td><td>
+
+_(Optional)_ Array of routeLoader$ hashes for this node's loaders
+
+</td></tr>
 </tbody></table>
 
 [Edit this section](https://github.com/QwikDev/qwik/tree/main/packages/qwik-router/src/runtime/src/types.ts)
@@ -2297,7 +2338,7 @@ _(Optional)_ The parameter name when this node is reached via `_W` or `_A` from 
 routeLoader$: LoaderConstructor;
 ```
 
-[Edit this section](https://github.com/QwikDev/qwik/tree/main/packages/qwik-router/src/runtime/src/server-functions.ts)
+[Edit this section](https://github.com/QwikDev/qwik/tree/main/packages/qwik-router/src/runtime/src/route-loaders.ts)
 
 <h2 id="routelocation">RouteLocation</h2>
 

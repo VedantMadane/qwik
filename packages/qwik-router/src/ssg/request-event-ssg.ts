@@ -1,10 +1,12 @@
 import { createCacheControl } from '@qwik-router-ssg-worker/middleware/request-handler/cache-control';
 import { Cookie } from '@qwik-router-ssg-worker/middleware/request-handler/cookie';
 import { createRequestEventWithDeps } from '@qwik-router-ssg-worker/middleware/request-handler/request-event-core';
-import { getRouteLoaderPromise } from '@qwik-router-ssg-worker/middleware/request-handler/request-loader';
 import {
-  getRouteMatchPathname,
-  IsQData,
+  IsQAction,
+  IsQLoader,
+  QActionId,
+  QLoaderId,
+  recognizeRequest,
 } from '@qwik-router-ssg-worker/middleware/request-handler/request-path';
 import {
   encoder,
@@ -16,13 +18,14 @@ import {
 } from '@qwik-router-ssg-worker/middleware/request-handler/redirect-handler';
 import { RewriteMessage } from '@qwik-router-ssg-worker/middleware/request-handler/rewrite-handler';
 import { ServerError } from '@qwik-router-ssg-worker/middleware/request-handler/server-error';
-import { QDATA_KEY, isPromise } from './worker-imports/runtime';
+import { QACTION_KEY, QDATA_KEY, isPromise } from './worker-imports/runtime';
 
 type CreateRequestEventArgs =
   Parameters<typeof createRequestEventWithDeps> extends [any, ...infer Rest] ? Rest : never;
 
 const requestEventDeps = {
   QDATA_KEY,
+  QACTION_KEY,
   isPromise,
   createCacheControl,
   Cookie,
@@ -30,9 +33,11 @@ const requestEventDeps = {
   RedirectMessage,
   RewriteMessage,
   ServerError,
-  getRouteLoaderPromise,
-  getRouteMatchPathname,
-  IsQData,
+  recognizeRequest,
+  IsQLoader,
+  IsQAction,
+  QLoaderId,
+  QActionId,
   encoder,
   getContentType,
 };

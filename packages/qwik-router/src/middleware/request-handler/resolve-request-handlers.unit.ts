@@ -46,18 +46,7 @@ function createMockRequestEvent(url = 'http://localhost:3000/test', trailingSlas
 
 describe('resolve-request-handler', () => {
   describe('getPathname', () => {
-    it('should remove q-data.json', () => {
-      globalThis.__NO_TRAILING_SLASH__ = false;
-      expect(getPathname(new URL('http://server/path/q-data.json?foo=bar#hash'))).toBe(
-        '/path/?foo=bar#hash'
-      );
-      globalThis.__NO_TRAILING_SLASH__ = true;
-      expect(getPathname(new URL('http://server/path/q-data.json?foo=bar#hash'))).toBe(
-        '/path?foo=bar#hash'
-      );
-    });
-
-    it('should pass non q-data.json through', () => {
+    it('should handle pathname with trailing slash', () => {
       globalThis.__NO_TRAILING_SLASH__ = false;
       expect(getPathname(new URL('http://server/path?foo=bar#hash'))).toBe('/path/?foo=bar#hash');
       globalThis.__NO_TRAILING_SLASH__ = true;
@@ -304,7 +293,7 @@ describe('resolve-request-handler', () => {
       const renderHandler = vi.fn(async (requestEv: { exit: () => void }) => {
         requestEv.exit();
       });
-      const handlers = resolveRequestHandlers(undefined, route, 'GET', true, renderHandler, false);
+      const handlers = resolveRequestHandlers(undefined, route, 'GET', true, renderHandler);
       const requestEv = createRequestEvent(
         createMockServerRequestEvent(),
         route,

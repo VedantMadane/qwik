@@ -276,8 +276,6 @@ export type EndpointModuleLoader = () => ValueOrPromise<RouteModule>;
 export type ModuleLoader = ContentModuleLoader | EndpointModuleLoader; //| RouteLoaderLoader;
 export type MenuModuleLoader = () => Promise<MenuModule>;
 
-export type RouteLoaderInfo = [qrl: string, expires: number, live?: true];
-
 /**
  * A nested route trie structure. The root represents `/` and each level represents a URL segment.
  *
@@ -320,6 +318,8 @@ export interface RouteData {
   _M?: RouteData[];
   /** Menu loader for this subtree (from menu.md). Runtime uses nearest ancestor during traversal. */
   _N?: MenuModuleLoader;
+  /** Array of routeLoader$ hashes for this node's loaders */
+  _R?: string[];
   /** Child route segments (any key not starting with `_`) */
   [part: string]:
     | RouteData
@@ -413,25 +413,19 @@ export interface LoadedRoute {
   $notFound$?: boolean;
   /** The error module loader (nearest _E ancestor), for rendering ServerErrors */
   $errorLoader$?: ContentModuleLoader;
+  /** Merged array of routeLoader$ hashes from all matched nodes (layouts + page) */
+  $loaders$?: string[];
+  /** Runtime-only mapping of routeLoader$ hashes to the matched pathname used for q-loader fetches */
+  $loaderPaths$?: Record<string, string>;
 }
 
 export interface EndpointResponse {
   status: number;
   statusMessage?: string;
-  loaders: Record<string, unknown>;
-  loadersSerializationStrategy: Map<string, SerializationStrategy>;
   formData?: FormData;
   action?: string;
-}
-
-export interface ClientPageData extends Omit<EndpointResponse, 'loadersSerializationStrategy'> {
-  href: string;
-  redirect?: string;
-  isRewrite?: boolean;
-}
-
-export interface LoaderData {
-  loaders: Record<string, unknown>;
+  actionResult?: unknown;
+  loaderHashes?: string[];
 }
 
 /** @public */
@@ -455,6 +449,8 @@ export interface QwikRouterEnvData {
   params: PathParams;
   response: EndpointResponse;
   loadedRoute: LoadedRoute;
+  routeLoaderCtx: import('./route-loaders').RouteLoaderCtx;
+  loaderValues: Record<string, unknown>;
 }
 
 /** @public The server data that is provided by Qwik Router during SSR rendering. It can be retrieved with `useServerData(key)` in the server, but it is not available in the client. */
@@ -521,6 +517,12 @@ export type GetValidatorType<VALIDATOR extends TypedDataValidator> =
 export type ActionOptions = {
   readonly id?: string;
   readonly validation?: DataValidator[];
+  /**
+   * Route loaders to invalidate after this action completes. The loader hooks' hashes are sent to
+   * the client so it knows which loaders to re-fetch. If omitted, ALL route loaders are
+   * invalidated.
+   */
+  readonly invalidate?: Loader<any>[];
 };
 
 /** @public */
@@ -762,9 +764,24 @@ export type ActionConstructorQRL = {
 
 /** @public */
 export type LoaderOptions = {
+  /** @deprecated Unused */
   readonly id?: string;
   readonly validation?: DataValidator[];
   readonly serializationStrategy?: SerializationStrategy;
+  /**
+   * Time in seconds after which the loader data is considered stale. The server sets
+   * `Cache-Control: max-age={expires}` on loader responses.
+   *
+   * On the client, the loader's AsyncSignal `interval` is set to `expires * 1000` ms. If `poll` is
+   * true, the signal auto-refetches when expired. If `poll` is false (default), the data is marked
+   * stale but not auto-refetched.
+   */
+  readonly expires?: number;
+  /**
+   * When true AND `expires` is set, the loader data is automatically refetched when it expires
+   * (polling behavior). When false (default), expired data is marked stale but not auto-refetched.
+   */
+  readonly poll?: boolean;
 };
 
 /** @public */
@@ -911,7 +928,7 @@ export interface LoaderInternal extends Loader<any> {
   __validators: DataValidator[] | undefined;
   __serializationStrategy: SerializationStrategy;
   __expires: number;
-  // __live: boolean;
+  __poll: boolean;
   (): LoaderSignal<unknown>;
 }
 
@@ -930,6 +947,8 @@ export interface ActionInternal extends Action<any, any> {
   __id: string;
   __qrl: QRL<(form: JSONObject, event: RequestEventAction) => ValueOrPromise<unknown>>;
   __validators: DataValidator[] | undefined;
+  /** Loader hashes to invalidate after this action. Undefined = invalidate all. */
+  __invalidate: string[] | undefined;
 
   (): ActionStore<unknown, unknown>;
 }

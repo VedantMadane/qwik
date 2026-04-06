@@ -29,7 +29,7 @@ export async function postBuild(
 
     const fsPath = join(fsDir, fsName);
 
-    if (fsName === 'index.html' || fsName === 'q-data.json') {
+    if (fsName === 'index.html' || /^q-loader-[^.]+\.[^.]+\.json$/.test(fsName)) {
       // static index.html file
       if (!staticPaths.has(pathname) && cleanStatic) {
         await fs.promises.unlink(fsPath);

@@ -123,7 +123,8 @@ function createSystem({
     createTimer: () => () => 0,
     getRouteFilePath: (pathname) =>
       `C:/tmp/out${pathname === '/' ? '/index.html' : `${pathname}/index.html`}`,
-    getDataFilePath: (pathname) => `C:/tmp/out${pathname}/q-data.json`,
+    getLoaderFilePath: (pathname, loaderId, manifestHash) =>
+      `C:/tmp/out${pathname}q-loader-${loaderId}.${manifestHash}.json`,
     getEnv: () => undefined,
     platform: {},
   };

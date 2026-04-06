@@ -65,12 +65,13 @@ export async function createSystem(opts: SsgGenerateOptions, threadId?: number):
     return join(outDir, pathname);
   };
 
-  const getDataFilePath = (pathname: string) => {
+  const getLoaderFilePath = (pathname: string, loaderId: string, manifestHash: string) => {
     pathname = decodeURIComponent(pathname.slice(basenameLen));
+    const suffix = `q-loader-${loaderId}.${manifestHash}.json`;
     if (pathname.endsWith('/')) {
-      pathname += 'q-data.json';
+      pathname += suffix;
     } else {
-      pathname += '/q-data.json';
+      pathname += '/' + suffix;
     }
     return join(outDir, pathname);
   };
@@ -84,7 +85,7 @@ export async function createSystem(opts: SsgGenerateOptions, threadId?: number):
     createTimer,
     access,
     getRouteFilePath,
-    getDataFilePath,
+    getLoaderFilePath,
     getEnv: (key) => process.env[key],
     platform: {
       static: true,

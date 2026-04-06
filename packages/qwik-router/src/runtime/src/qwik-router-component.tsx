@@ -19,23 +19,24 @@ import {
 import {
   _getContextContainer,
   _hasStoreEffects,
-  _UNINITIALIZED,
   _waitUntilRendered,
+  createAsync$,
   forceStoreEffects,
-  SerializerSymbol,
+  _retryOnPromise as retryOnPromise,
   type AsyncSignal,
   type ClientContainer,
-  type SerializationStrategy,
   type ValueOrPromise,
 } from '@qwik.dev/core/internal';
 import { clientNavigate } from './client-navigate';
-import { CLIENT_DATA_CACHE, DEFAULT_LOADERS_SERIALIZATION_STRATEGY, Q_ROUTE } from './constants';
+import { Q_ROUTE } from './constants';
+import { prefetchRoute } from './prefetch-route';
 import {
   ContentContext,
   ContentInternalContext,
   DocumentHeadContext,
   HttpStatusContext,
   RouteActionContext,
+  RouteLoaderCtxContext,
   RouteLocationContext,
   RouteNavigateContext,
   RoutePreventNavigateContext,
@@ -52,10 +53,14 @@ import {
   saveScrollHistory,
 } from './scroll-restoration';
 import spaInit from './spa-init';
+import {
+  ensureRouteLoaderSignals,
+  setLoaderSignalValue,
+  updateRouteLoaderCtx,
+} from './route-loaders';
 import type {
   Action,
   ActionInternal,
-  ClientPageData,
   ContentModule,
   ContentState,
   ContentStateInternal,
@@ -75,9 +80,9 @@ import type {
   RouteStateInternal,
   ScrollState,
 } from './types';
-import { loadClientData } from './use-endpoint';
+import { submitAction } from './use-endpoint';
 import { useQwikRouterEnv } from './use-functions';
-import { createLoaderSignal, isSameOrigin, isSamePath, toPath, toUrl } from './utils';
+import { isSameOrigin, isSamePath, toPath, toUrl } from './utils';
 import { startViewTransition } from './view-transition';
 
 declare const window: ClientSPAWindow;
@@ -119,7 +124,7 @@ const preventNav: {
 
 // Track navigations during prevent so we don't overwrite
 // We need to use an object so we can write into it from qrls
-const internalState = { navCount: 0 };
+const internalState = { navCount: 0, redirectCount: 0 };
 
 /**
  * @public
@@ -167,42 +172,22 @@ export const useQwikRouter = (props?: QwikRouterProps) => {
   };
   const routeLocation = useStore<MutableRouteLocation>(routeLocationTarget, { deep: false });
   const navResolver: { r?: () => void } = {};
-  const container = _getContextContainer();
-  const getSerializationStrategy = (loaderId: string): SerializationStrategy => {
-    return (
-      env.response.loadersSerializationStrategy.get(loaderId) ||
-      DEFAULT_LOADERS_SERIALIZATION_STRATEGY
-    );
-  };
-
-  // On server this object contains the all the loaders data
-  // On client after resuming this object contains only keys and _UNINITIALIZED as values
-  // Thanks to this we can use this object as a capture ref and not to serialize unneeded data
-  // While resolving the loaders we will override the _UNINITIALIZED with the actual data
-  const loadersObject: Record<string, unknown> = {};
-
-  // This object contains the signals for the loaders
-  // It is used for the loaders context RouteStateContext
-  const loaderState: Record<string, AsyncSignal<unknown>> = {};
-
-  for (const [key, value] of Object.entries(env.response.loaders)) {
-    loadersObject[key] = value;
-    loaderState[key] = createLoaderSignal(
-      loadersObject,
-      key,
-      url,
-      getSerializationStrategy(key),
-      container
-    );
-  }
-  // Serialize it as keys and _UNINITIALIZED as values
-  (loadersObject as any)[SerializerSymbol] = (obj: Record<string, unknown>) => {
-    const loadersSerializationObject: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj)) {
-      loadersSerializationObject[k] = getSerializationStrategy(k) === 'always' ? v : _UNINITIALIZED;
+  // Set manifestHash/pageUrl here since they're not available during middleware execution
+  env.routeLoaderCtx.manifestHash = manifestHash || '';
+  env.routeLoaderCtx.pageUrl = url;
+  // deep: true so that changes to loaderPaths properties are tracked by AsyncSignal QRLs
+  const routeLoaderCtx = useStore(env.routeLoaderCtx);
+  // Create AsyncSignals whose QRL closures capture the store proxy for client-side reactivity.
+  // Then set .value from middleware-computed loader values (inert, non-reactive data).
+  const loaderState = useStore<Record<string, AsyncSignal<unknown>>>({}, { deep: false });
+  const contentModulesForInit = env.loadedRoute.$mods$ as ContentModule[];
+  const loaders = ensureRouteLoaderSignals(contentModulesForInit, loaderState, routeLoaderCtx);
+  for (const loader of loaders) {
+    const value = env.loaderValues[loader.__id];
+    if (value !== undefined) {
+      setLoaderSignalValue(loaderState[loader.__id], value);
     }
-    return loadersSerializationObject;
-  };
+  }
 
   // The initial state of routeInternal uses the URL provided by the server environment.
   // It may not be accurate to the actual URL the browser is accessing the site from.
@@ -231,7 +216,7 @@ export const useQwikRouter = (props?: QwikRouterProps) => {
   });
 
   const currentActionId = env.response.action;
-  const currentAction = currentActionId ? env.response.loaders[currentActionId] : undefined;
+  const currentAction = currentActionId ? env.response.actionResult : undefined;
   const actionState = useSignal<RouteActionValue>(
     currentAction
       ? {
@@ -412,8 +397,8 @@ export const useQwikRouter = (props?: QwikRouterProps) => {
     };
 
     if (isBrowser) {
-      loadClientData(dest);
-      loadRoute(qwikRouterConfig.routes, qwikRouterConfig.cacheModules, dest.pathname);
+      // Prefetch: start loading route bundles and optionally loader data
+      prefetchRoute(dest, true, 0.8, manifestHash);
     }
 
     actionState.value = undefined;
@@ -431,6 +416,9 @@ export const useQwikRouter = (props?: QwikRouterProps) => {
   useContextProvider(RouteLocationContext, routeLocation);
   useContextProvider(RouteNavigateContext, goto);
   useContextProvider(RouteStateContext, loaderState);
+  useContextProvider(RouteLoaderCtxContext, routeLoaderCtx);
+  // Set goto on the loader context so async loader fetch can do SPA redirects
+  routeLoaderCtx.goto = goto as any;
   useContextProvider(RouteActionContext, actionState);
   useContextProvider<any>(RoutePreventNavigateContext, registerPreventNav);
 
@@ -445,13 +433,15 @@ export const useQwikRouter = (props?: QwikRouterProps) => {
       const navType = action ? 'form' : navigation.type;
       const replaceState = navigation.replaceState;
       let trackUrl: URL;
-      let clientPageData: EndpointResponse | ClientPageData | undefined;
+      let endpointResponse: EndpointResponse | undefined;
+      let actionData: { action?: string; actionResult?: unknown; status: number } | undefined;
       let loadedRoute: LoadedRoute;
       if (isServer) {
         // server
         trackUrl = new URL(navigation.dest, routeLocation.url);
         loadedRoute = env!.loadedRoute;
-        clientPageData = env!.response;
+        endpointResponse = env!.response;
+        actionData = endpointResponse;
       } else {
         // client
         trackUrl = new URL(navigation.dest, location as any as URL);
@@ -464,55 +454,96 @@ export const useQwikRouter = (props?: QwikRouterProps) => {
         } else if (!globalThis.__NO_TRAILING_SLASH__) {
           trackUrl.pathname += '/';
         }
-        let loadRoutePromise = loadRoute(
+        const loadRoutePromise = loadRoute(
           qwikRouterConfig.routes,
           qwikRouterConfig.cacheModules,
           trackUrl.pathname
         );
-        const pageData = (clientPageData = await loadClientData(trackUrl, {
-          action,
-          clearCache: true,
-        }));
-        if (!pageData) {
-          // Reset the path to the current path
-          routeInternal.untrackedValue = { type: navType, dest: trackUrl };
-          return;
-        }
-        const newHref = pageData.href;
-        const newURL = new URL(newHref, trackUrl);
-        if (!isSamePath(newURL, trackUrl)) {
-          // Change our path to the canonical path in the response unless rewrite.
-          if (!pageData.isRewrite) {
-            trackUrl = newURL;
-          }
-
-          loadRoutePromise = loadRoute(
-            qwikRouterConfig.routes,
-            qwikRouterConfig.cacheModules,
-            newURL.pathname // Load the actual required path.
-          );
-        }
-
         try {
           loadedRoute = await loadRoutePromise;
         } catch (e) {
           console.error(e);
-          window.location.href = newHref;
+          window.location.href = trackUrl.href;
           return;
+        }
+
+        // Submit action if one was triggered
+        if (action) {
+          const result = await submitAction(action, trackUrl.pathname);
+          if (!result) {
+            // Redirect happened — bail
+            routeInternal.untrackedValue = { type: navType, dest: trackUrl };
+            return;
+          }
+
+          actionData = {
+            status: result.status,
+            action: action.id,
+            actionResult: result.result,
+          };
+
+          // Resolve the action promise
+          if (action.resolve) {
+            action.resolve({
+              status: result.status,
+              result: result.result,
+            });
+          }
+
+          // Apply loader updates from action result via setLoaderSignalValue.
+          // This preserves track() subscriptions for future re-computations.
+          if (result.loaderValues && Object.keys(result.loaderValues).length > 0) {
+            for (const [id, value] of Object.entries(result.loaderValues)) {
+              const signal = loaderState[id];
+              if (signal) {
+                setLoaderSignalValue(signal, value);
+              }
+            }
+          }
+          if (result.loaderHashes) {
+            for (const hash of result.loaderHashes) {
+              loaderState[hash]?.invalidate(true);
+            }
+          }
         }
       }
 
       const { $routeName$, $params$, $mods$, $menu$, $notFound$ } = loadedRoute;
       const contentModules = $mods$ as ContentModule[];
+      // Update the loader context for the new route (triggers track subscriptions)
+      updateRouteLoaderCtx(routeLoaderCtx, loadedRoute.$loaderPaths$, trackUrl);
+      const routeLoaders = ensureRouteLoaderSignals(contentModules, loaderState, routeLoaderCtx);
+      // Await all loader signals — promise() triggers $computeIfNeeded$ for
+      // INVALID signals (from store change or newly created) and waits for completion
+      const navCountBefore = internalState.navCount;
+      if (!isServer && routeLoaders.length > 0) {
+        await Promise.all(routeLoaders.map((loader) => loaderState[loader.__id]?.promise()));
+      }
+
+      // If a loader triggered a redirect via goto() during computation,
+      // navCount will have changed. Bail so the redirect navigation takes over.
+      if (internalState.navCount !== navCountBefore) {
+        if (++internalState.redirectCount > 20) {
+          console.error('Too many redirects, aborting navigation');
+          internalState.redirectCount = 0;
+          return;
+        }
+        return;
+      }
+      internalState.redirectCount = 0;
 
       // Update httpStatus for 404/error pages
       if ($notFound$) {
         httpStatus.value = { status: 404, message: 'Not Found' };
-      } else {
+      } else if (endpointResponse) {
         httpStatus.value = {
-          status: clientPageData?.status ?? 200,
-          message: (clientPageData as EndpointResponse)?.statusMessage ?? '',
+          status: endpointResponse.status,
+          message: endpointResponse.statusMessage ?? 'OK',
         };
+      } else if (actionData) {
+        httpStatus.value = { status: actionData.status, message: 'OK' };
+      } else {
+        httpStatus.value = { status: 200, message: 'OK' };
       }
       const pageModule = contentModules[contentModules.length - 1] as PageModule;
 
@@ -547,13 +578,11 @@ export const useQwikRouter = (props?: QwikRouterProps) => {
 
       routeInternal.untrackedValue = { type: navType, dest: trackUrl };
 
-      // Needs to be done after routeLocation is updated
-      const resolvedHead = resolveHead(
-        clientPageData!,
-        routeLocation,
-        contentModules,
-        locale,
-        serverHead
+      // Needs to be done after routeLocation is updated.
+      // Wrapped in retryOnPromise because signal.value may throw a promise on the client
+      // when signals are still loading.
+      const resolvedHead = await retryOnPromise(() =>
+        resolveHead(actionData, loaderState, routeLocation, contentModules, locale, serverHead)
       );
 
       // Update content
@@ -587,27 +616,6 @@ export const useQwikRouter = (props?: QwikRouterProps) => {
           (document as any).__q_scroll_restore__ = () =>
             restoreScroll(navType, trackUrl, prevUrl, scroller, scrollState);
         }
-
-        const loaders = clientPageData?.loaders;
-        if (loaders) {
-          for (const [key, value] of Object.entries(loaders)) {
-            const signal = loaderState[key];
-            const awaitedValue = await value;
-            loadersObject[key] = awaitedValue;
-            if (!signal) {
-              loaderState[key] = createLoaderSignal(
-                loadersObject,
-                key,
-                trackUrl,
-                DEFAULT_LOADERS_SERIALIZATION_STRATEGY,
-                container
-              );
-            } else {
-              signal.invalidate();
-            }
-          }
-        }
-        CLIENT_DATA_CACHE.clear();
 
         // See also spa-init.ts
         if (!window._qRouterSPA) {
@@ -952,7 +960,10 @@ const useQwikMockRouter = (props: QwikRouterMockProps) => {
     },
     {} as Record<string, QwikRouterMockLoaderProp['data']>
   );
-  const loaderState = useStore(loadersData ?? {}, { deep: false });
+  const loaderState = useStore<Record<string, AsyncSignal<unknown>>>({}, { deep: false });
+  for (const [loaderId, data] of Object.entries(loadersData ?? {})) {
+    loaderState[loaderId] ||= createAsync$(async () => data, { initial: data });
+  }
 
   const goto: RouteNavigate =
     props.goto ??

@@ -286,6 +286,7 @@ export const vnode_newText = (textNode: Text, textContent: string | undefined): 
   return vnode;
 };
 
+/** @internal */
 export const vnode_newVirtual = (): VirtualVNode => {
   const vnode: VirtualVNode = new VirtualVNode(
     null,
@@ -415,6 +416,7 @@ export const vnode_getProp = <T = unknown>(
   return null;
 };
 
+/** @internal */
 export const vnode_setProp = (vNode: VNode, key: string, value: unknown) => {
   if (value == null && vNode.props) {
     delete vNode.props[key];

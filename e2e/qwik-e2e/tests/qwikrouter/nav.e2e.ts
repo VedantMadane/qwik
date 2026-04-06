@@ -37,7 +37,7 @@ test.describe('nav', () => {
     });
 
     test('should update history before async SPA route load completes', async ({ page }) => {
-      await page.route('**/products/jacket/q-data.json', async (route) => {
+      await page.route('**/products/jacket/q-loader-*.json', async (route) => {
         await new Promise((resolve) => setTimeout(resolve, 600));
         await route.continue();
       });
@@ -258,6 +258,33 @@ test.describe('nav', () => {
       await mpaLink.click();
       expect(didTrigger).toBe(true);
     });
+
+    test('second nav() call should win when two are fired back-to-back', async ({ page }) => {
+      await page.goto('/qwikrouter-test/double-nav/a/');
+      await expect(page.locator('#double-nav-a')).toBeVisible();
+
+      const btn = page.locator('#double-nav-btn');
+      await btn.click();
+
+      // Should end up at C (the second nav call), not B
+      await expect(page.locator('#double-nav-c')).toBeVisible();
+      expect(new URL(page.url()).pathname).toBe('/qwikrouter-test/double-nav/c/');
+      await expect(page.locator('#double-nav-c-data')).toHaveText('data-c');
+    });
+
+    test('loader redirect via query string should SPA navigate to target', async ({ page }) => {
+      await page.goto('/qwikrouter-test/loader-redirect/');
+      await expect(page.locator('#loader-redirect-home')).toBeVisible();
+
+      const btn = page.locator('#loader-redirect-btn');
+      await btn.click();
+
+      // Should end up at the redirect target, not the source route
+      await expect(page.locator('#loader-redirect-target')).toBeVisible({ timeout: 5000 });
+      expect(new URL(page.url()).pathname).toBe('/qwikrouter-test/loader-redirect/target/');
+      expect(new URL(page.url()).searchParams.get('done')).toBe('true');
+      await expect(page.locator('#loader-redirect-target-data')).toHaveText('target-data');
+    });
   }
 
   function tests() {
@@ -470,17 +497,6 @@ test.describe('nav', () => {
       );
 
       await expect(page.locator('#redirected-result')).toHaveText('true');
-    });
-
-    test('server plugin q-data redirect from /redirectme to /', async ({ baseURL }) => {
-      const res = await fetch(new URL('/qwikrouter-test/redirectme/q-data.json', baseURL), {
-        redirect: 'manual',
-        headers: {
-          Accept: 'application/json',
-        },
-      });
-      expect(res.status).toBe(301);
-      expect(res.headers.get('Location')).toBe('/qwikrouter-test/q-data.json');
     });
 
     test('should not execute task from removed layout, and should be executed only once for SPA', async ({

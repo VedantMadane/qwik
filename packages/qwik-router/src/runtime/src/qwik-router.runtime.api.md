@@ -354,11 +354,17 @@ export interface QwikRouterEnvData {
     // (undocumented)
     loadedRoute: LoadedRoute;
     // (undocumented)
+    loaderValues: Record<string, unknown>;
+    // (undocumented)
     params: PathParams;
     // Warning: (ae-forgotten-export) The symbol "EndpointResponse" needs to be exported by the entry point index.d.ts
     //
     // (undocumented)
     response: EndpointResponse;
+    // Warning: (ae-forgotten-export) The symbol "RouteLoaderCtx" needs to be exported by the entry point index.d.ts
+    //
+    // (undocumented)
+    routeLoaderCtx: RouteLoaderCtx;
     // (undocumented)
     routeName: string;
 }
@@ -463,6 +469,7 @@ export interface RouteData {
     // Warning: (ae-forgotten-export) The symbol "MenuModuleLoader" needs to be exported by the entry point index.d.ts
     _N?: MenuModuleLoader;
     _P?: string;
+    _R?: string[];
 }
 
 // Warning: (ae-forgotten-export) The symbol "LoaderConstructor" needs to be exported by the entry point index.d.ts
