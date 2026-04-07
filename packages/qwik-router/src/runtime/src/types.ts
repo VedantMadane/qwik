@@ -520,8 +520,8 @@ export type ActionOptions = {
   readonly validation?: DataValidator[];
   /**
    * Route loaders to invalidate after this action completes. The loader hooks' hashes are sent to
-   * the client so it knows which loaders to re-fetch. If omitted, ALL route loaders are
-   * invalidated.
+   * the client so it knows which loaders to re-fetch. If omitted, ALL route loaders are invalidated
+   * (unless `strictLoaders` is enabled globally in the Vite plugin).
    */
   readonly invalidate?: Loader<any>[];
 };
@@ -797,6 +797,14 @@ export type LoaderOptions = {
    * When not set, all search params are sent and any change triggers a re-fetch.
    */
   readonly search?: string[];
+  /**
+   * When true (default), the previous value is kept while the loader re-fetches after navigation,
+   * so components see stale data until the new response arrives.
+   *
+   * When false, the value is cleared on re-fetch, causing reads to suspend (show a loading
+   * boundary). This is useful when showing old data during navigation would be confusing.
+   */
+  readonly allowStale?: boolean;
 };
 
 /** @public */
@@ -951,6 +959,7 @@ export interface LoaderInternal extends Loader<any> {
   __poll: boolean;
   __eTag: boolean | string | ((ev: RequestEvent) => string | null) | undefined;
   __search: string[] | undefined;
+  __allowStale: boolean;
   (): LoaderSignal<unknown>;
 }
 

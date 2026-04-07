@@ -133,7 +133,7 @@ export function actionHandler(
     if (action.__invalidate) {
       // Action specifies which loaders to invalidate — send only hashes, client re-fetches
       responseData.h = action.__invalidate;
-    } else {
+    } else if (!globalThis.__STRICT_LOADERS__) {
       // No invalidate list — re-run ALL loaders and send their values back.
       // Store in request's loaderValues so cross-loader resolveValue() works.
       const loaderValues = getRouteLoaderValues(requestEv);

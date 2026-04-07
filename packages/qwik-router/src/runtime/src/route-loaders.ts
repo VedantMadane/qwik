@@ -244,6 +244,7 @@ const createRouteLoaderSignal = (loader: LoaderInternal, routeLoaderCtx: RouteLo
     {
       serializationStrategy: loader.__serializationStrategy,
       interval: getLoaderInterval(loader.__expires, loader.__poll),
+      allowStale: loader.__allowStale,
     }
   );
 };
@@ -266,6 +267,7 @@ const getLoaderOptions = (rest: (LoaderOptions | DataValidator)[]) => {
   let poll: boolean | undefined;
   let eTag: LoaderOptions['eTag'] | undefined;
   let search: string[] | undefined;
+  let allowStale = true;
   const validators: DataValidator[] = [];
 
   if (rest.length === 1) {
@@ -291,6 +293,11 @@ const getLoaderOptions = (rest: (LoaderOptions | DataValidator)[]) => {
         }
         if (options.search) {
           search = options.search;
+        } else if (globalThis.__STRICT_LOADERS__) {
+          search = [];
+        }
+        if (options.allowStale === false) {
+          allowStale = false;
         }
       }
     }
@@ -305,6 +312,7 @@ const getLoaderOptions = (rest: (LoaderOptions | DataValidator)[]) => {
     poll,
     eTag,
     search,
+    allowStale,
   };
 };
 
@@ -500,7 +508,8 @@ export const routeLoaderQrl = ((
   loaderQrl: QRL<(event: RequestEventLoader) => unknown>,
   ...rest: (LoaderOptions | DataValidator)[]
 ): LoaderInternal => {
-  const { validators, serializationStrategy, expires, poll, eTag, search } = getLoaderOptions(rest);
+  const { validators, serializationStrategy, expires, poll, eTag, search, allowStale } =
+    getLoaderOptions(rest);
 
   function loader() {
     const state = _resolveContextWithoutSequentialScope(RouteStateContext)!;
@@ -519,11 +528,38 @@ export const routeLoaderQrl = ((
   loader.__poll = poll ?? false;
   loader.__eTag = eTag;
   loader.__search = search;
+  loader.__allowStale = allowStale;
   Object.freeze(loader);
   return loader;
 }) as LoaderConstructorQRL;
 
-/** @public */
+/**
+ * Define a route loader that fetches data before the route renders.
+ *
+ * Route loaders run on the server during SSR and return data as an `AsyncSignal`. On the client,
+ * loaders automatically re-fetch when the route changes (SPA navigation). Each loader gets its own
+ * JSON endpoint (`q-loader-{id}.{hash}.json`), so only the loaders present on the target route are
+ * fetched.
+ *
+ * **Important:** Route loader data uses Qwik's custom serialization format, not standard JSON. This
+ * means the data supports features like circular references, Dates, and other non-JSON types, but
+ * it cannot be consumed by external clients expecting plain JSON.
+ *
+ * ## Options
+ *
+ * - `search: string[]` — Allowlist of URL search params the loader depends on. Only listed params are
+ *   sent in the request and changes to other params are ignored. `search: []` means no search
+ *   params are sent and only route path changes trigger a re-fetch.
+ * - `allowStale: false` — Clears the previous value when re-fetching, so components see a loading
+ *   state instead of stale data during navigation. Useful when old data would be confusing.
+ * - `eTag` — Enable ETag-based caching. Can be `true` (auto-hash), a string, or a function.
+ * - `expires` / `poll` — Control client-side caching and polling behavior.
+ *
+ * The `strictLoaders` Vite plugin option applies `search: []` globally for all loaders that don't
+ * specify an explicit `search` option.
+ *
+ * @public
+ */
 export const routeLoader$: LoaderConstructor = /*#__PURE__*/ implicit$FirstArg(routeLoaderQrl);
 
 async function runValidators(

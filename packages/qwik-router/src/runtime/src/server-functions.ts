@@ -183,7 +183,26 @@ export const globalActionQrl = ((
   return action;
 }) as ActionConstructorQRL;
 
-/** @public */
+/**
+ * Define a route action that handles form submissions or programmatic invocations.
+ *
+ * Actions run on the server when submitted from the client. The result is returned as an
+ * `ActionStore` with `.value` for success data and `.error` for errors (including validation errors
+ * from `zod$`/`valibot$` where `.fieldErrors` etc. are accessible directly on `.error`).
+ *
+ * By default, after an action completes, ALL route loaders are re-run and their updated data is
+ * sent back in the response. This can be controlled with:
+ *
+ * - `invalidate: [loader1, loader2]` — Only invalidate specific loaders. The client re-fetches them
+ *   individually. Other loaders keep their current data.
+ * - `invalidate: []` — No loaders are re-run or invalidated. The action response only contains the
+ *   action result. Use this when the action doesn't affect any loader data.
+ *
+ * The `strictLoaders` Vite plugin option applies `invalidate: []` globally for all actions that
+ * don't specify an explicit `invalidate` option.
+ *
+ * @public
+ */
 export const routeAction$: ActionConstructor = /*#__PURE__*/ implicit$FirstArg(
   routeActionQrl
 ) as any;

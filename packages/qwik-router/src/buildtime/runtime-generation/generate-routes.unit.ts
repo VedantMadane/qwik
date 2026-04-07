@@ -61,6 +61,7 @@ function getRoutesExpr(trie: BuildTrieNode, routes: BuiltRoute[] = []): string {
       mdxPlugins: null!,
       rewriteRoutes: null!,
       defaultLoadersSerializationStrategy: 'never',
+      strictLoaders: true,
     },
     routeTrie: trie,
     routes,

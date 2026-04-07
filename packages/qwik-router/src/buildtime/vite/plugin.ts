@@ -116,6 +116,7 @@ function qwikRouterPlugin(userOpts?: QwikRouterVitePluginOptions) {
           'globalThis.__SSR_CACHE_SIZE__': JSON.stringify(
             viteEnv.command === 'serve' ? 0 : (userOpts?.ssrCacheSize ?? 50)
           ),
+          'globalThis.__STRICT_LOADERS__': JSON.stringify(userOpts?.strictLoaders !== false),
         },
         appType: 'custom',
         resolve: {
