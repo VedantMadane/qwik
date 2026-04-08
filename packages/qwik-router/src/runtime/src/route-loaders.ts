@@ -2,6 +2,7 @@ import { implicit$FirstArg, isDev, isServer, type QRL } from '@qwik.dev/core';
 import {
   _deserialize,
   _getContextEvent,
+  _injectAsyncSignalValue,
   _resolveContextWithoutSequentialScope,
   _verifySerializable,
   createAsync$,
@@ -438,13 +439,14 @@ export const ensureRouteLoaderSignals = (
 };
 
 /**
- * Inject a pre-loaded value into an AsyncSignal while preserving track() subscriptions. Uses
- * invalidate({ __v }) + $computeIfNeeded$() so the compute function runs synchronously, registers
- * subscriptions via track(), and returns the pre-loaded value without fetching.
+ * Inject a pre-loaded value into an AsyncSignal while preserving track() subscriptions. Delegates
+ * to the core helper which calls invalidate({ __v }) + $computeIfNeeded$() so the compute function
+ * runs synchronously, registers subscriptions via track(), and returns the pre-loaded value without
+ * fetching. Must go through the core helper because $computeIfNeeded$ is mangled in core builds and
+ * not directly callable from this package.
  */
 export const setLoaderSignalValue = (signal: AsyncSignal<unknown>, value: unknown) => {
-  signal.invalidate({ __v: value });
-  (signal as any).$computeIfNeeded$();
+  _injectAsyncSignalValue(signal, value);
 };
 
 export const resolveRouteLoaderByHash = (
