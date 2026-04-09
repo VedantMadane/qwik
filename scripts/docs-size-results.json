@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "generatedAt": "2026-04-08T17:38:01.244Z",
+  "generatedAt": "2026-04-09T07:49:48.111Z",
   "routes": {
     "/": {
-      "rawBytes": 217472,
-      "gzipBytes": 45020
+      "rawBytes": 217474,
+      "gzipBytes": 45291
     },
     "/docs": {
-      "rawBytes": 1064047,
-      "gzipBytes": 179707
+      "rawBytes": 1064049,
+      "gzipBytes": 178460
     }
   }
 }
