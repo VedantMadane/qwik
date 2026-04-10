@@ -447,7 +447,11 @@ export class AsyncSignalImpl<T>
     } catch (err) {
       running.$promise$ = null;
       DEBUG && log('Error caught in promise.catch', err);
-      if (isCurrent()) {
+      // AbortError from an aborted AbortSignal is an internal cancellation
+      // (e.g., cleanup → new compute replacing us). We must not leak that into
+      // user-visible state; the replacement job will write the real value/error.
+      const isAbort = err instanceof Error && err.name === 'AbortError';
+      if (isCurrent() && !isAbort) {
         this.untrackedError = err as Error;
         // Reset value so next read throws the promise instead of returning stale data
         this.$untrackedValue$ = NEEDS_COMPUTATION;

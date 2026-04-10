@@ -194,10 +194,13 @@ const createRouteLoaderSignal = (loader: LoaderInternal, routeLoaderCtx: RouteLo
       if (info && typeof info === 'object' && '__v' in (info as object)) {
         return (info as { __v: unknown }).__v;
       }
-      // If the loader isn't present on the current route, throw so the signal
-      // enters NEEDS_COMPUTATION state (prevents returning stale data)
+      // A loader that's never been on any route we've visited has no fetch path yet —
+      // return whatever value it has (undefined on the very first run). In practice
+      // this branch only fires on the initial client-side read for a loader that
+      // wasn't prefilled by SSR; normal navs leave stale entries in loaderPaths so
+      // this compute only runs when there's a fresh path to fetch against.
       if (!routePath) {
-        throw new Error(`Loader ${id} not available on current route`);
+        return previous;
       }
 
       // Filter search params: only include allowed params and skip fetch if unchanged
@@ -381,19 +384,21 @@ export function getRouteLoaderCtx(requestEv: RequestEventBase): RouteLoaderCtx {
   return ctx;
 }
 
-/** Update the loader paths store on client-side navigation. */
+/**
+ * Update the loader paths store on client-side navigation.
+ *
+ * Only adds/updates entries for loaders present on the new route. Entries for loaders that are NOT
+ * on the new route are left untouched — their AsyncSignals keep their prior values, and no track()
+ * fires to invalidate them. If the user navigates back to a route where the loader IS present, the
+ * path updates and the signal re-fetches. This is the "stale is fine by default" contract: readers
+ * see old data until new data arrives.
+ */
 export const updateRouteLoaderCtx = (
   ctx: RouteLoaderCtx,
   loaderPaths: Record<string, string> | undefined,
   pageUrl: URL
 ) => {
   ctx.pageUrl = pageUrl;
-  for (const key of Object.keys(ctx.loaderPaths)) {
-    if (!loaderPaths?.[key]) {
-      ctx.loaderPaths[key] = undefined;
-    }
-  }
-  // Add/update paths
   if (loaderPaths) {
     for (const [key, value] of Object.entries(loaderPaths)) {
       ctx.loaderPaths[key] = value;

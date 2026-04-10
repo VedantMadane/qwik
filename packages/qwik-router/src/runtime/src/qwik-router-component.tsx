@@ -123,9 +123,9 @@ const preventNav: {
   $handler$?: (event: BeforeUnloadEvent) => void;
 } = {};
 
-// Track navigations during prevent so we don't overwrite
-// We need to use an object so we can write into it from qrls
-const internalState = { navCount: 0, redirectCount: 0 };
+// Track navigations during prevent so we don't overwrite.
+// We need to use an object so we can write into it from qrls.
+const internalState = { navCount: 0 };
 
 /**
  * @public
@@ -230,7 +230,6 @@ export const useQwikRouter = (props?: QwikRouterProps) => {
         }
       : undefined
   );
-
   const registerPreventNav = $((fn$: QRL<PreventNavigateCallback>) => {
     if (!isBrowser) {
       return;
@@ -429,10 +428,13 @@ export const useQwikRouter = (props?: QwikRouterProps) => {
       const navigation = track(routeInternal);
       const action = track(actionState);
 
-      const locale = getLocale('');
       const prevUrl = routeLocation.url;
       const navType = action ? 'form' : navigation.type;
       const replaceState = navigation.replaceState;
+      // Capture navCount at task entry. If another goto() fires while we're awaiting
+      // loadRoute or loaders, navCount will have been bumped and we should bail so
+      // the task's next invocation takes over with the newer destination.
+      const navCountBefore = internalState.navCount;
       let trackUrl: URL;
       let endpointResponse: EndpointResponse | undefined;
       let actionData: { action?: string; actionResult?: unknown; status: number } | undefined;
@@ -465,6 +467,10 @@ export const useQwikRouter = (props?: QwikRouterProps) => {
         } catch (e) {
           console.error(e);
           window.location.href = trackUrl.href;
+          return;
+        }
+        // Bail if a second nav() was fired while we were loading route modules.
+        if (internalState.navCount !== navCountBefore) {
           return;
         }
 
@@ -512,27 +518,16 @@ export const useQwikRouter = (props?: QwikRouterProps) => {
 
       const { $routeName$, $params$, $mods$, $menu$, $notFound$ } = loadedRoute;
       const contentModules = $mods$ as ContentModule[];
-      // Update the loader context for the new route (triggers track subscriptions)
       updateRouteLoaderCtx(routeLoaderCtx, loadedRoute.$loaderPaths$, trackUrl);
       const routeLoaders = ensureRouteLoaderSignals(contentModules, loaderState, routeLoaderCtx);
-      // Await all loader signals — promise() triggers $computeIfNeeded$ for
-      // INVALID signals (from store change or newly created) and waits for completion
-      const navCountBefore = internalState.navCount;
       if (!isServer && routeLoaders.length > 0) {
-        await Promise.all(routeLoaders.map((loader) => loaderState[loader.__id]?.promise()));
+        await Promise.all(
+          routeLoaders.map((loader) => loaderState[loader.__id]?.promise().catch(() => {}))
+        );
       }
-
-      // If a loader triggered a redirect via goto() during computation,
-      // navCount will have changed. Bail so the redirect navigation takes over.
       if (internalState.navCount !== navCountBefore) {
-        if (++internalState.redirectCount > 20) {
-          console.error('Too many redirects, aborting navigation');
-          internalState.redirectCount = 0;
-          return;
-        }
         return;
       }
-      internalState.redirectCount = 0;
 
       // Update httpStatus for 404/error pages
       if ($notFound$) {
@@ -580,11 +575,18 @@ export const useQwikRouter = (props?: QwikRouterProps) => {
 
       routeInternal.untrackedValue = { type: navType, dest: trackUrl };
 
-      // Needs to be done after routeLocation is updated.
-      // Wrapped in retryOnPromise because signal.value may throw a promise on the client
-      // when signals are still loading.
+      // Resolve the head after routeLocation is updated. Wrapped in retryOnPromise
+      // because loader signal `.value` reads may throw a compute promise on the client
+      // when a signal is still loading — retryOnPromise awaits it and re-invokes.
       const resolvedHead = await retryOnPromise(() =>
-        resolveHead(actionData, loaderState, routeLocation, contentModules, locale, serverHead)
+        resolveHead(
+          actionData,
+          loaderState,
+          routeLocation,
+          contentModules,
+          getLocale(''),
+          serverHead
+        )
       );
 
       // Update content
