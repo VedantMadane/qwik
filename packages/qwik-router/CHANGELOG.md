@@ -1,5 +1,20 @@
 # @qwik.dev/city
 
+## 2.0.0-beta.32
+
+### Minor Changes
+
+- ✨ the `notFound` exports of the router factory functions no longer do anything, because the `router` exports handle not-found routes. (by [@wmertens](https://github.com/wmertens) in [#8534](https://github.com/QwikDev/qwik/pull/8534))
+
+### Patch Changes
+
+- 🐞🩹 fix an SPA routing bug where using browser back/forward after a manual refresh could change the URL without rerendering the page (by [@Varixo](https://github.com/Varixo) in [#8544](https://github.com/QwikDev/qwik/pull/8544))
+
+- 🐞🩹 image imports `foo.png?jsx` are now more robust (by [@wmertens](https://github.com/wmertens) in [#8533](https://github.com/QwikDev/qwik/pull/8533))
+
+- Updated dependencies [[`ccb7579`](https://github.com/QwikDev/qwik/commit/ccb7579d4db0d63c106ed3f5e221fd52dbab6c92), [`06d82e0`](https://github.com/QwikDev/qwik/commit/06d82e0d657f56e4d767bbcc0aab3dacf9be50ba), [`7ae409d`](https://github.com/QwikDev/qwik/commit/7ae409deb7432f800c1a33206108e059cc4af1dd), [`7ae409d`](https://github.com/QwikDev/qwik/commit/7ae409deb7432f800c1a33206108e059cc4af1dd), [`06d82e0`](https://github.com/QwikDev/qwik/commit/06d82e0d657f56e4d767bbcc0aab3dacf9be50ba), [`fe3c4e2`](https://github.com/QwikDev/qwik/commit/fe3c4e23a1bf6e12842ad88f6392f3d62a5db80b)]:
+  - @qwik.dev/core@2.0.0-beta.32
+
 ## 2.0.0-beta.31
 
 ### Minor Changes

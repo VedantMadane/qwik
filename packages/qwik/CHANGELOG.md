@@ -1,5 +1,27 @@
 # @qwik.dev/core
 
+## 2.0.0-beta.32
+
+### Minor Changes
+
+- ✨ Qwik now supports `passive:eventname` markers for JSX event handlers. Use them with matching `on*$/document:on*$/window:on*$` listeners when you want passive browser listeners for events like `touchstart`, `touchmove`, or `scroll`. (by [@Varixo](https://github.com/Varixo) in [#8523](https://github.com/QwikDev/qwik/pull/8523))
+
+- ✨ The optimizer now supports inline `@qwik-disable-next-line` hints, allowing you to suppress specific diagnostics for the next line when needed, such as `preventdefault-passive-check`. (by [@Varixo](https://github.com/Varixo) in [#8523](https://github.com/QwikDev/qwik/pull/8523))
+
+- ✨ Qwik now supports `capture:eventname` markers for JSX event handlers. Use them when you want run event in capture phase (by [@Varixo](https://github.com/Varixo) in [#8525](https://github.com/QwikDev/qwik/pull/8525))
+
+### Patch Changes
+
+- Add `allowStale` option to AsyncSignal and routeLoader$. When `false`, invalidation clears the (by [@wmertens](https://github.com/wmertens) in [#8537](https://github.com/QwikDev/qwik/pull/8537))
+  previous value so reads suspend instead of returning stale data.
+
+- 🐞🩹 run `preventdefault:*`, `stoppropagation:*`, and `sync$` event work synchronously in the loader for all nested events (by [@Varixo](https://github.com/Varixo) in [#8540](https://github.com/QwikDev/qwik/pull/8540))
+
+- 🐞🩹 preserve browser event execution order for async lazy-loaded handlers (by [@Varixo](https://github.com/Varixo) in [#8540](https://github.com/QwikDev/qwik/pull/8540))
+
+- Updated dependencies [[`06d82e0`](https://github.com/QwikDev/qwik/commit/06d82e0d657f56e4d767bbcc0aab3dacf9be50ba), [`06d82e0`](https://github.com/QwikDev/qwik/commit/06d82e0d657f56e4d767bbcc0aab3dacf9be50ba)]:
+  - @qwik.dev/optimizer@2.1.0-beta.2
+
 ## 2.0.0-beta.31
 
 ### Minor Changes
